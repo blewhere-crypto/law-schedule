@@ -933,7 +933,7 @@
 
   async function refreshNaverStatus() {
     try {
-      var res = await sb.functions.invoke("naver-calendar", { body: { action: "status" } });
+      var res = await sb.functions.invoke("super-endpoint", { body: { action: "status" } });
       updateNaverConnectBtn(!!(res.data && res.data.connected));
     } catch (e) {
       updateNaverConnectBtn(false);
@@ -943,7 +943,7 @@
   async function addEventToNaverCalendar(ev, btnEl) {
     if (btnEl) btnEl.disabled = true;
     try {
-      var res = await sb.functions.invoke("naver-calendar", {
+      var res = await sb.functions.invoke("super-endpoint", {
         body: { action: "createSchedule", icalString: buildNaverICS(ev) },
       });
       if (res.error || (res.data && res.data.error)) {
@@ -1584,7 +1584,7 @@
     document.getElementById("naverConnectBtn").addEventListener("click", async function () {
       if (this.dataset.connected) {
         if (!confirm("네이버 캘린더 연동을 해제할까요?")) return;
-        await sb.functions.invoke("naver-calendar", { body: { action: "disconnect" } });
+        await sb.functions.invoke("super-endpoint", { body: { action: "disconnect" } });
         updateNaverConnectBtn(false);
       } else {
         startNaverConnect();
@@ -1601,7 +1601,7 @@
         return;
       }
       sessionStorage.removeItem("naverOAuthState");
-      var res = await sb.functions.invoke("naver-calendar", {
+      var res = await sb.functions.invoke("super-endpoint", {
         body: { action: "exchange", code: e.data.code, state: e.data.state },
       });
       if (res.error || (res.data && res.data.error)) {
