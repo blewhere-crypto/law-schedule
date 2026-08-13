@@ -350,7 +350,19 @@
     padding: 10px 12px;
     flex-wrap: wrap;
     gap: 6px;
+    cursor: pointer;
   }
+  .case-group-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 2px 4px;
+    transition: transform 0.15s;
+  }
+  .case-group.collapsed .case-group-toggle { transform: rotate(-90deg); }
+  .case-group.collapsed .case-group-list { display: none; }
   .case-group-number { font-weight: 700; font-size: 13.5px; color: var(--navy-dark); }
   .case-group-title { font-size: 12.5px; color: var(--text-muted); margin-left: 4px; }
   .case-group-meta {
@@ -602,7 +614,10 @@
     </div>
 
     <div id="caseView" style="display:none;">
-      <input type="text" id="caseSearchInput" placeholder="의뢰인명 또는 사건명으로 검색" />
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <input type="text" id="caseSearchInput" placeholder="의뢰인명 또는 사건명으로 검색" style="flex:1; margin-bottom:0;" />
+        <button type="button" class="btn-ghost" id="toggleAllCasesBtn" style="font-size:12px; padding:8px 12px; white-space:nowrap;">모두 접기</button>
+      </div>
       <div id="caseGroupList"></div>
     </div>
   </div>
@@ -704,6 +719,7 @@
     activeView: "calendar", // "calendar" | "case"
     currentUser: null,
     urgentFilter: "all", // "all" | "today" | "week" | "overdue"
+    collapsedCases: {}, // { [caseNumber]: true } — 사건별 보기에서 접힌 사건
   };
 
   function rowToEvent(row) {
@@ -1011,13 +1027,18 @@
   }
 
   // ---------- 사건별 보기 ----------
+  function toggleCaseCollapsed(key) {
+    state.collapsedCases[key] = !state.collapsedCases[key];
+    renderCaseView();
+  }
+
   function nearestUpcomingDiff(evs) {
     var pending = evs.filter(function (e) { return !e.done; }).map(function (e) { return diffDaysFromToday(e.date); });
     if (pending.length === 0) return null;
     return Math.min.apply(null, pending);
   }
 
-  function renderCaseView() {
+  function getFilteredCaseGroups() {
     var query = document.getElementById("caseSearchInput").value.trim().toLowerCase();
     var groups = {};
     state.events.forEach(function (ev) {
@@ -1039,6 +1060,12 @@
       if (nb === null) return -1;
       return na - nb;
     });
+    return { groups: groups, keys: keys, query: query };
+  }
+
+  function renderCaseView() {
+    var found = getFilteredCaseGroups();
+    var groups = found.groups, keys = found.keys, query = found.query;
 
     var container = document.getElementById("caseGroupList");
     container.innerHTML = "";
@@ -1056,22 +1083,28 @@
       var pendingCount = evs.filter(function (e) { return !e.done; }).length;
       var latest = evs[evs.length - 1];
       var groupLabel = formatCaseLabel({ caseNumber: key, caseTitle: titleSample ? titleSample.caseTitle : "" });
+      var isCollapsed = !!state.collapsedCases[key];
 
       var group = document.createElement("div");
-      group.className = "case-group";
+      group.className = "case-group" + (isCollapsed ? " collapsed" : "");
 
       var header = document.createElement("div");
       header.className = "case-group-header";
       header.innerHTML =
-        '<div><span class="case-group-number">' + escapeHtml(groupLabel) + '</span></div>' +
+        '<div><button type="button" class="case-group-toggle">▾</button><span class="case-group-number">' + escapeHtml(groupLabel) + '</span></div>' +
         '<div class="case-group-meta"><span>진행중 ' + pendingCount + '건</span></div>';
+      header.addEventListener("click", function (e) {
+        if (e.target.closest("button") && !e.target.closest(".case-group-toggle")) return;
+        toggleCaseCollapsed(key);
+      });
 
       var addBtn = document.createElement("button");
       addBtn.type = "button";
       addBtn.className = "btn-ghost";
       addBtn.style.cssText = "font-size:11px;padding:4px 10px;";
       addBtn.textContent = "+ 이 사건에 일정 추가";
-      addBtn.addEventListener("click", function () {
+      addBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
         openFormModal({
           caseNumber: groupLabel,
           type: latest.type,
@@ -1088,6 +1121,9 @@
       group.appendChild(listEl);
       container.appendChild(group);
     });
+
+    var anyExpanded = keys.some(function (k) { return !state.collapsedCases[k]; });
+    document.getElementById("toggleAllCasesBtn").textContent = anyExpanded ? "모두 접기" : "모두 펼치기";
   }
 
   function switchView(view) {
@@ -1429,6 +1465,12 @@
     document.getElementById("tabCalendar").addEventListener("click", function () { switchView("calendar"); });
     document.getElementById("tabByCase").addEventListener("click", function () { switchView("case"); });
     document.getElementById("caseSearchInput").addEventListener("input", renderCaseView);
+    document.getElementById("toggleAllCasesBtn").addEventListener("click", function () {
+      var keys = getFilteredCaseGroups().keys;
+      var anyExpanded = keys.some(function (k) { return !state.collapsedCases[k]; });
+      keys.forEach(function (k) { state.collapsedCases[k] = anyExpanded; });
+      renderCaseView();
+    });
 
     document.getElementById("dayModalClose").addEventListener("click", closeDayModal);
     document.getElementById("dayModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeDayModal(); });
