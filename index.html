@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="일정관리" />
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --navy: #1e3a5f;
@@ -303,6 +304,59 @@
   }
   .case-group-list { padding: 10px 12px; }
 
+  /* 로그인 화면 */
+  #authOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #authOverlay.open { display: flex; }
+  .auth-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 360px;
+    padding: 28px 24px;
+  }
+  .auth-box h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+    color: var(--navy-dark);
+  }
+  .auth-box .auth-sub {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+  }
+  .auth-msg {
+    font-size: 12.5px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    display: none;
+  }
+  .auth-msg.error { display: block; color: var(--danger); background: var(--danger-bg); }
+  .auth-msg.info { display: block; color: var(--navy-dark); background: #eef2f7; }
+  .header-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header-user .user-email {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* 모달 */
   #modalOverlay {
     display: none;
@@ -401,13 +455,38 @@
 </style>
 </head>
 <body>
-<div class="app">
+
+<div id="authOverlay">
+  <div class="auth-box">
+    <h1>일정관리 로그인</h1>
+    <div class="auth-sub">본인만 사용하는 개인 계정입니다. 여러 기기에서 같은 계정으로 로그인하면 일정이 동기화됩니다.</div>
+    <div id="authMsg" class="auth-msg"></div>
+    <div class="field">
+      <label for="authEmail">이메일</label>
+      <input type="text" id="authEmail" placeholder="you@example.com" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label for="authPassword">비밀번호</label>
+      <input type="password" id="authPassword" placeholder="6자 이상" autocomplete="current-password" />
+    </div>
+    <div style="display:flex; gap:8px; margin-top:4px;">
+      <button type="button" class="btn-ghost" id="authSignupBtn" style="flex:1;padding:10px;font-weight:600;">회원가입</button>
+      <button type="button" class="btn-primary btn" id="authLoginBtn" style="flex:1;">로그인</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none;">
   <header>
     <div>
       <h1>일정관리</h1>
       <div class="today-label" id="todayLabel"></div>
     </div>
-    <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
+    <div class="header-user">
+      <span class="user-email" id="userEmailLabel"></span>
+      <button class="btn-ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px;">로그아웃</button>
+      <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
+    </div>
   </header>
 
   <div class="card">
@@ -528,7 +607,10 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "lawScheduleEvents_v1";
+  var SUPABASE_URL = "https://vgqhteollbpdvpdsogsy.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZncWh0ZW9sbGJwZHZwZHNvZ3N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1ODg0NTIsImV4cCI6MjEwMjE2NDQ1Mn0.AfQ0hgxMc4JRhAUdqD9fBOQCqi0Hn7zWdBRRX1YlaNw";
+  var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   var TYPE_COLOR_VAR = {
     "변론기일": "var(--type-변론기일)",
     "선고기일": "var(--type-선고기일)",
@@ -545,26 +627,45 @@
     showDone: false,
     dayModalDate: null,
     activeView: "calendar", // "calendar" | "case"
+    currentUser: null,
   };
 
-  function loadEvents() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      state.events = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      state.events = [];
-    }
-    // 이전 버전 데이터(사건명/사건번호 통합 필드) 마이그레이션
-    state.events.forEach(function (ev) {
-      if (ev.caseNumber === undefined) {
-        ev.caseNumber = ev.caseName || "";
-        ev.caseTitle = "";
-        delete ev.caseName;
-      }
-    });
+  function rowToEvent(row) {
+    return {
+      id: row.id,
+      caseNumber: row.case_number,
+      caseTitle: row.case_title || "",
+      type: row.type,
+      date: row.date,
+      time: row.time || "",
+      court: row.court || "",
+      memo: row.memo || "",
+      done: !!row.done,
+    };
   }
-  function saveEvents() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events)); }
-  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function eventToRow(ev) {
+    return {
+      case_number: ev.caseNumber,
+      case_title: ev.caseTitle || "",
+      type: ev.type,
+      date: ev.date,
+      time: ev.time || "",
+      court: ev.court || "",
+      memo: ev.memo || "",
+      done: !!ev.done,
+    };
+  }
+
+  async function refreshEventsFromServer() {
+    var res = await sb.from("events").select("*").order("date", { ascending: true });
+    if (res.error) {
+      console.error(res.error);
+      alert("일정을 불러오지 못했습니다: " + res.error.message);
+      return;
+    }
+    state.events = (res.data || []).map(rowToEvent);
+    renderAll();
+  }
 
   function todayStr() {
     var d = new Date();
@@ -636,12 +737,17 @@
     return row;
   }
 
-  function toggleDone(id, done) {
+  async function toggleDone(id, done) {
     var ev = state.events.find(function (e) { return e.id === id; });
     if (!ev) return;
     ev.done = done;
-    saveEvents();
     renderAll();
+    var res = await sb.from("events").update({ done: done }).eq("id", id);
+    if (res.error) {
+      alert("저장 실패: " + res.error.message);
+      ev.done = !done;
+      renderAll();
+    }
   }
 
   // ---------- 중요 일정 ----------
@@ -936,7 +1042,7 @@
   }
   function closeFormModal() { document.getElementById("modalOverlay").classList.remove("open"); }
 
-  function submitForm(e) {
+  async function submitForm(e) {
     e.preventDefault();
     var id = document.getElementById("eventId").value;
     var base = {
@@ -950,31 +1056,40 @@
     var rows = collectDateRows();
     if (rows.length === 0) return;
 
+    var saveBtn = document.getElementById("eventForm").querySelector('button[type="submit"]');
+    saveBtn.disabled = true;
+
+    var res;
     if (id) {
-      var ev = state.events.find(function (e2) { return e2.id === id; });
-      if (ev) {
-        Object.assign(ev, base);
-        ev.date = rows[0].date;
-        ev.time = rows[0].time;
-      }
+      var patch = eventToRow(Object.assign({}, base, { date: rows[0].date, time: rows[0].time }));
+      res = await sb.from("events").update(patch).eq("id", id);
     } else {
-      rows.forEach(function (r) {
-        state.events.push(Object.assign({}, base, { id: uid(), date: r.date, time: r.time, done: false }));
+      var payload = rows.map(function (r) {
+        return eventToRow(Object.assign({}, base, { date: r.date, time: r.time, done: false }));
       });
+      res = await sb.from("events").insert(payload);
     }
-    saveEvents();
+
+    saveBtn.disabled = false;
+    if (res.error) {
+      alert("저장 실패: " + res.error.message);
+      return;
+    }
     closeFormModal();
-    renderAll();
+    await refreshEventsFromServer();
   }
 
-  function deleteCurrentEvent() {
+  async function deleteCurrentEvent() {
     var id = document.getElementById("eventId").value;
     if (!id) return;
     if (!confirm("이 일정을 삭제할까요?")) return;
-    state.events = state.events.filter(function (e) { return e.id !== id; });
-    saveEvents();
+    var res = await sb.from("events").delete().eq("id", id);
+    if (res.error) {
+      alert("삭제 실패: " + res.error.message);
+      return;
+    }
     closeFormModal();
-    renderAll();
+    await refreshEventsFromServer();
   }
 
   function renderAll() {
@@ -983,16 +1098,94 @@
     if (state.activeView === "case") renderCaseView();
   }
 
+  // ---------- 로그인 ----------
+  var realtimeChannel = null;
+
+  function showAuthMsg(text, kind) {
+    var el = document.getElementById("authMsg");
+    el.textContent = text;
+    el.className = "auth-msg " + (kind || "error");
+  }
+  function clearAuthMsg() {
+    var el = document.getElementById("authMsg");
+    el.textContent = "";
+    el.className = "auth-msg";
+  }
+
+  async function onSignedIn(user) {
+    state.currentUser = user;
+    document.getElementById("authOverlay").classList.remove("open");
+    document.getElementById("appRoot").style.display = "";
+    document.getElementById("userEmailLabel").textContent = user.email || "";
+    await refreshEventsFromServer();
+    if (!realtimeChannel) {
+      realtimeChannel = sb
+        .channel("events-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "events" }, function () {
+          refreshEventsFromServer();
+        })
+        .subscribe();
+    }
+  }
+
+  function onSignedOut() {
+    state.currentUser = null;
+    state.events = [];
+    if (realtimeChannel) {
+      sb.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+    document.getElementById("appRoot").style.display = "none";
+    document.getElementById("authOverlay").classList.add("open");
+  }
+
+  async function initAuth() {
+    var sessionRes = await sb.auth.getSession();
+    var session = sessionRes.data && sessionRes.data.session;
+    if (session) onSignedIn(session.user);
+    else onSignedOut();
+
+    sb.auth.onAuthStateChange(function (event, session) {
+      if (session) onSignedIn(session.user);
+      else onSignedOut();
+    });
+  }
+
+  function wireAuthUI() {
+    document.getElementById("authLoginBtn").addEventListener("click", async function () {
+      clearAuthMsg();
+      var email = document.getElementById("authEmail").value.trim();
+      var password = document.getElementById("authPassword").value;
+      if (!email || !password) { showAuthMsg("이메일과 비밀번호를 입력해주세요."); return; }
+      var res = await sb.auth.signInWithPassword({ email: email, password: password });
+      if (res.error) showAuthMsg(res.error.message);
+    });
+
+    document.getElementById("authSignupBtn").addEventListener("click", async function () {
+      clearAuthMsg();
+      var email = document.getElementById("authEmail").value.trim();
+      var password = document.getElementById("authPassword").value;
+      if (!email || !password) { showAuthMsg("이메일과 비밀번호를 입력해주세요."); return; }
+      if (password.length < 6) { showAuthMsg("비밀번호는 6자 이상이어야 합니다."); return; }
+      var res = await sb.auth.signUp({ email: email, password: password });
+      if (res.error) { showAuthMsg(res.error.message); return; }
+      if (res.data && res.data.session) return; // 이메일 확인이 꺼져 있으면 바로 로그인됨
+      showAuthMsg("가입 확인 이메일을 보냈습니다. 메일함을 확인한 뒤 로그인해주세요.", "info");
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", function () { sb.auth.signOut(); });
+  }
+
   // ---------- 초기화 ----------
   function init() {
-    loadEvents();
     var now = new Date();
     state.calYear = now.getFullYear();
     state.calMonth = now.getMonth();
 
     renderTodayLabel();
     renderCalDow();
-    renderAll();
+    wireAuthUI();
+    initAuth();
 
     document.getElementById("addBtn").addEventListener("click", function () { openFormModal({}); });
     document.getElementById("cancelBtn").addEventListener("click", closeFormModal);

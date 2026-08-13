@@ -1,4 +1,4 @@
-var CACHE_NAME = "law-schedule-v2";
+var CACHE_NAME = "law-schedule-v3";
 var ASSETS = [
   "./",
   "./index.html",
@@ -34,6 +34,10 @@ function isPageRequest(request) {
 
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
+
+  // Supabase API, realtime websocket, CDN 스크립트 등 외부 origin 요청은
+  // 캐시 로직을 타지 않고 그대로 네트워크로 흘려보냅니다.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   if (isPageRequest(event.request)) {
     // 페이지 본문은 네트워크를 우선 시도해서 항상 최신 버전을 받아오고,
