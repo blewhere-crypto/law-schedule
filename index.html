@@ -801,6 +801,65 @@
   }
 
   // ---------- 이벤트 행 (공통 렌더러) ----------
+  // ---------- 캘린더로 내보내기 (.ics) ----------
+  // 네이버 캘린더는 URL로 바로 일정을 추가하는 방법이 없어서, 표준 iCalendar(.ics) 파일을
+  // 내려받은 뒤 네이버 캘린더의 "일정 가져오기" 기능으로 등록하는 방식을 씁니다.
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function icsUtcStamp(y, m, d, h, min) {
+    // 입력 시각은 한국(Asia/Seoul, UTC+9) 기준으로 보고 UTC로 변환
+    var utc = new Date(Date.UTC(y, m - 1, d, h - 9, min));
+    return utc.getUTCFullYear() + pad2(utc.getUTCMonth() + 1) + pad2(utc.getUTCDate()) +
+      "T" + pad2(utc.getUTCHours()) + pad2(utc.getUTCMinutes()) + "00Z";
+  }
+
+  function escapeICSText(s) {
+    return (s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  }
+
+  function buildICS(ev) {
+    var parts = ev.date.split("-").map(Number);
+    var y = parts[0], m = parts[1], d = parts[2];
+    var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//일정관리//KR", "CALSCALE:GREGORIAN", "BEGIN:VEVENT"];
+    lines.push("UID:" + ev.id + "@law-schedule");
+    var now = new Date();
+    lines.push("DTSTAMP:" + now.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z");
+
+    if (ev.time) {
+      var hm = ev.time.split(":").map(Number);
+      lines.push("DTSTART:" + icsUtcStamp(y, m, d, hm[0], hm[1]));
+      lines.push("DTEND:" + icsUtcStamp(y, m, d, hm[0] + 1, hm[1]));
+    } else {
+      var startStr = "" + y + pad2(m) + pad2(d);
+      var endObj = new Date(y, m - 1, d + 1);
+      var endStr = endObj.getFullYear() + pad2(endObj.getMonth() + 1) + pad2(endObj.getDate());
+      lines.push("DTSTART;VALUE=DATE:" + startStr);
+      lines.push("DTEND;VALUE=DATE:" + endStr);
+    }
+
+    lines.push("SUMMARY:" + escapeICSText(formatCaseLabel(ev) + " - " + ev.type));
+    if (ev.court) lines.push("LOCATION:" + escapeICSText(ev.court));
+    if (ev.memo) lines.push("DESCRIPTION:" + escapeICSText(ev.memo));
+    lines.push("END:VEVENT");
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+
+  function downloadICS(ev) {
+    var content = buildICS(ev);
+    var blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var fileName = (formatCaseLabel(ev) + "_" + ev.type + "_" + ev.date).replace(/[\\/:*?"<>|]/g, "") + ".ics";
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    alert('".ics" 파일을 내려받았습니다.\n네이버 캘린더 웹(calendar.naver.com)에서 좌측 하단 "가져오기" 또는 설정 메뉴의 "일정 가져오기"를 눌러 방금 받은 파일을 선택하면 등록됩니다.');
+  }
+
   function buildEventRowEl(ev) {
     var diff = diffDaysFromToday(ev.date);
     var row = document.createElement("div");
@@ -823,10 +882,17 @@
         '<div class="event-case">' + escapeHtml(primaryText) + '</div>' +
         '<div class="event-sub">' + escapeHtml(subParts.join(" · ")) + '</div>' +
       '</div>' +
-      '<div class="event-actions"><button type="button" class="btn-icon edit-btn" title="수정">✎</button></div>';
+      '<div class="event-actions">' +
+        '<button type="button" class="btn-icon ics-btn" title="네이버 캘린더로 내보내기 (.ics 다운로드)">⬇</button>' +
+        '<button type="button" class="btn-icon edit-btn" title="수정">✎</button>' +
+      '</div>';
 
     row.querySelector(".done-check").addEventListener("change", function () {
       toggleDone(ev.id, this.checked);
+    });
+    row.querySelector(".ics-btn").addEventListener("click", function (e) {
+      e.stopPropagation();
+      downloadICS(ev);
     });
     row.querySelector(".edit-btn").addEventListener("click", function () {
       openFormModal({ editId: ev.id });
