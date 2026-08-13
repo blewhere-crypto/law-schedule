@@ -1,12 +1,12 @@
 {
-  "name": "일정관리 - 변호사 대시보드",
-  "short_name": "일정관리",
+  "name": "로펌새연 이시연 변호사님 일정관리",
+  "short_name": "로펌새연 일정관리",
   "description": "재판기일, 서면 제출 등 업무 일정을 관리하는 개인용 대시보드",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f2f4f7",
-  "theme_color": "#1e3a5f",
+  "background_color": "#faf6ef",
+  "theme_color": "#8a5a1f",
   "orientation": "portrait",
   "lang": "ko",
   "icons": [

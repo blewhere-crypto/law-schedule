@@ -3,29 +3,31 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>일정관리 · 변호사 대시보드</title>
+<title>로펌새연 이시연 변호사님 일정관리</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-<meta name="theme-color" content="#1e3a5f" />
+<meta name="theme-color" content="#8a5a1f" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="일정관리" />
+<meta name="apple-mobile-web-app-title" content="로펌새연 일정관리" />
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --navy: #1e3a5f;
-    --navy-dark: #142943;
-    --bg: #f2f4f7;
+    --navy: #8a5a1f;
+    --navy-dark: #5c3c14;
+    --gold: #c48437;
+    --gold-soft: #f3e4cd;
+    --bg: #faf6ef;
     --card: #ffffff;
-    --border: #e2e6ec;
-    --text: #1f2937;
-    --text-muted: #6b7280;
+    --border: #e9ddc8;
+    --text: #2b2013;
+    --text-muted: #7a6a54;
     --danger: #dc2626;
     --danger-bg: #fef2f2;
-    --warn: #d97706;
-    --warn-bg: #fffbeb;
+    --warn: #b45309;
+    --warn-bg: #fdf1e0;
     --ok: #16a34a;
     --type-변론기일: #2563eb;
     --type-선고기일: #7c3aed;
@@ -55,10 +57,14 @@
     gap: 12px;
   }
   header h1 {
-    font-size: 22px;
+    font-size: 18px;
     margin: 0;
     color: var(--navy-dark);
+    line-height: 1.3;
   }
+  .header-title { display: flex; align-items: center; gap: 12px; }
+  .brand-logo { width: 44px; height: auto; flex: 0 0 auto; }
+  .auth-box-logo { width: 64px; height: auto; display: block; margin: 0 auto 14px; }
   header .today-label {
     font-size: 13px;
     color: var(--text-muted);
@@ -150,7 +156,7 @@
     transition: border-color 0.15s, background 0.15s;
   }
   .stat-tile:hover { border-color: var(--navy); }
-  .stat-tile.active { border-color: var(--navy); border-width: 2px; background: #eef2f7; }
+  .stat-tile.active { border-color: var(--navy); border-width: 2px; background: var(--gold-soft); }
   .stat-num { font-size: 26px; font-weight: 800; color: var(--navy-dark); line-height: 1.1; }
   .stat-label { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
   .stat-tile.accent-today .stat-num { color: var(--danger); }
@@ -212,7 +218,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
-    background: #fafbfc;
+    background: #fbf8f2;
   }
   .event-row.overdue { background: var(--danger-bg); border-color: #fecaca; }
   .event-row.soon { background: var(--warn-bg); border-color: #fde68a; }
@@ -335,8 +341,8 @@
     flex-direction: column;
     gap: 2px;
   }
-  .cal-cell:hover { background: #f7f9fb; }
-  .cal-cell.other-month { background: #fafafa; color: #c3c8d0; }
+  .cal-cell:hover { background: #fbf8f2; }
+  .cal-cell.other-month { background: #f6f0e4; color: #cdbfa5; }
   .cal-cell.today { border-color: var(--navy); border-width: 2px; }
   .cal-cell.holiday .cal-date-num, .cal-cell.sunday .cal-date-num { color: var(--danger); }
   .cal-dow.sun { color: var(--danger); }
@@ -380,7 +386,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #f7f9fb;
+    background: #fbf8f2;
     padding: 10px 12px;
     flex-wrap: wrap;
     gap: 6px;
@@ -446,7 +452,7 @@
     display: none;
   }
   .auth-msg.error { display: block; color: var(--danger); background: var(--danger-bg); }
-  .auth-msg.info { display: block; color: var(--navy-dark); background: #eef2f7; }
+  .auth-msg.info { display: block; color: var(--navy-dark); background: var(--gold-soft); }
   .utility-bar {
     display: flex;
     justify-content: flex-end;
@@ -501,11 +507,11 @@
 
   .form-section {
     border: 1px solid var(--border);
-    border-left: 3px solid var(--navy);
+    border-left: 3px solid var(--gold);
     border-radius: 10px;
     padding: 14px 14px 2px;
     margin-bottom: 14px;
-    background: #fafbfc;
+    background: #fbf8f2;
   }
   .form-section.section-schedule { border-left-color: var(--warn); }
   .form-section.section-extra { border-left-color: var(--text-muted); }
@@ -622,7 +628,8 @@
 
 <div id="authOverlay">
   <div class="auth-box">
-    <h1>일정관리 로그인</h1>
+    <img src="icons/logo-mark.png" alt="로펌새연" class="auth-box-logo" />
+    <h1>로펌새연 일정관리 로그인</h1>
     <div class="auth-sub">본인만 사용하는 개인 계정입니다. 여러 기기에서 같은 계정으로 로그인하면 일정이 동기화됩니다.</div>
     <div id="authMsg" class="auth-msg"></div>
     <div class="field">
@@ -668,9 +675,12 @@
     <button type="button" class="link-btn" id="logoutBtn">로그아웃</button>
   </div>
   <header>
-    <div>
-      <h1>일정관리</h1>
-      <div class="today-label" id="todayLabel"></div>
+    <div class="header-title">
+      <img src="icons/logo-mark.png" alt="로펌새연" class="brand-logo" />
+      <div>
+        <h1>로펌새연 이시연 변호사님 일정관리</h1>
+        <div class="today-label" id="todayLabel"></div>
+      </div>
     </div>
     <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
   </header>
