@@ -280,7 +280,16 @@
   .cal-cell:hover { background: #f7f9fb; }
   .cal-cell.other-month { background: #fafafa; color: #c3c8d0; }
   .cal-cell.today { border-color: var(--navy); border-width: 2px; }
+  .cal-cell.holiday .cal-date-num { color: var(--danger); }
   .cal-date-num { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .holiday-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--danger);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .cal-chip {
     font-size: 10.5px;
     padding: 1px 5px;
@@ -813,6 +822,57 @@
   // ---------- 캘린더 ----------
   var DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
+  // 대한민국 법정공휴일 (수동 관리 목록 — 음력 기반 날짜는 매년 바뀌므로 연도가 지나면 갱신 필요.
+  // 정확한 날짜는 관공서 발표 기준으로 다시 확인하는 것을 권장합니다.)
+  var KR_HOLIDAYS = {
+    "2025-01-01": "신정",
+    "2025-01-28": "설날 연휴",
+    "2025-01-29": "설날",
+    "2025-01-30": "설날 연휴",
+    "2025-03-01": "삼일절",
+    "2025-03-03": "대체공휴일",
+    "2025-05-05": "어린이날·부처님오신날",
+    "2025-05-06": "대체공휴일",
+    "2025-06-06": "현충일",
+    "2025-08-15": "광복절",
+    "2025-10-03": "개천절",
+    "2025-10-05": "추석 연휴",
+    "2025-10-06": "추석",
+    "2025-10-07": "추석 연휴",
+    "2025-10-08": "대체공휴일",
+    "2025-10-09": "한글날",
+    "2025-12-25": "크리스마스",
+
+    "2026-01-01": "신정",
+    "2026-02-16": "설날 연휴",
+    "2026-02-17": "설날",
+    "2026-02-18": "설날 연휴",
+    "2026-03-01": "삼일절",
+    "2026-03-02": "대체공휴일",
+    "2026-05-05": "어린이날",
+    "2026-05-24": "부처님오신날",
+    "2026-05-25": "대체공휴일",
+    "2026-06-06": "현충일",
+    "2026-08-15": "광복절",
+    "2026-08-17": "대체공휴일",
+    "2026-09-24": "추석 연휴",
+    "2026-09-25": "추석",
+    "2026-09-26": "추석 연휴",
+    "2026-10-03": "개천절",
+    "2026-10-05": "대체공휴일",
+    "2026-10-09": "한글날",
+    "2026-12-25": "크리스마스",
+
+    "2027-01-01": "신정",
+    "2027-03-01": "삼일절",
+    "2027-05-05": "어린이날",
+    "2027-06-06": "현충일",
+    "2027-08-15": "광복절",
+    "2027-10-03": "개천절",
+    "2027-10-09": "한글날",
+    "2027-12-25": "크리스마스",
+  };
+
   function renderCalDow() {
     var el = document.getElementById("calDow");
     el.innerHTML = DOW_LABELS.map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
@@ -839,8 +899,9 @@
       var cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
       var cellDateStr = cellDate.getFullYear() + "-" + pad(cellDate.getMonth() + 1) + "-" + pad(cellDate.getDate());
       var isOtherMonth = cellDate.getMonth() !== month;
+      var holidayName = KR_HOLIDAYS[cellDateStr];
       var cell = document.createElement("div");
-      cell.className = "cal-cell" + (isOtherMonth ? " other-month" : "") + (cellDateStr === todayS ? " today" : "");
+      cell.className = "cal-cell" + (isOtherMonth ? " other-month" : "") + (cellDateStr === todayS ? " today" : "") + (holidayName ? " holiday" : "");
       cell.setAttribute("data-date", cellDateStr);
 
       var dayEvents = (eventsByDate[cellDateStr] || []).slice().sort(function (a, b) {
@@ -849,6 +910,9 @@
       if (dayEvents.length > 0) cell.className += " has-events";
 
       var html = '<div class="cal-date-num">' + cellDate.getDate() + '</div>';
+      if (holidayName) {
+        html += '<div class="holiday-label" title="' + escapeHtml(holidayName) + '">' + escapeHtml(holidayName) + '</div>';
+      }
       var shown = dayEvents.slice(0, 3);
       shown.forEach(function (ev) {
         html += '<div class="cal-chip" style="background:' + typeColor(ev.type) + (ev.done ? ";opacity:.5" : "") + '">' +
