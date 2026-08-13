@@ -453,6 +453,28 @@
     overflow-y: auto;
   }
   .modal h3 { margin: 0 0 16px; font-size: 17px; color: var(--navy-dark); }
+
+  .form-section {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--navy);
+    border-radius: 10px;
+    padding: 14px 14px 2px;
+    margin-bottom: 14px;
+    background: #fafbfc;
+  }
+  .form-section.section-schedule { border-left-color: var(--warn); }
+  .form-section.section-extra { border-left-color: var(--text-muted); }
+  .form-section-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--navy);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+  }
+  .form-section.section-schedule .form-section-title { color: #b45309; }
+  .form-section.section-extra .form-section-title { color: var(--text-muted); }
+
   .field { margin-bottom: 14px; }
   .field label {
     display: block;
@@ -634,42 +656,55 @@
     <h3 id="formTitle">일정 추가</h3>
     <form id="eventForm">
       <input type="hidden" id="eventId" />
-      <div class="field" id="caseNumberPickerField">
-        <label for="caseNumberPicker">기존 사건에서 선택 (선택사항)</label>
-        <select id="caseNumberPicker">
-          <option value="">직접 입력 (신규 사건)</option>
-        </select>
-        <div class="field-hint">선택하면 아래 사건 구분과 법원이 자동으로 채워집니다.</div>
+
+      <div class="form-section section-case">
+        <div class="form-section-title">사건</div>
+        <div class="field" id="caseNumberPickerField">
+          <label for="caseNumberPicker">기존 사건에서 선택 (선택사항)</label>
+          <select id="caseNumberPicker">
+            <option value="">직접 입력 (신규 사건)</option>
+          </select>
+          <div class="field-hint">선택하면 아래 사건 구분과 법원이 자동으로 채워집니다.</div>
+        </div>
+        <div class="field">
+          <label for="caseNumber">사건 구분 (의뢰인명(사건명))</label>
+          <input type="text" id="caseNumber" placeholder="예) 홍길동(손해배상)" required />
+        </div>
       </div>
-      <div class="field">
-        <label for="caseNumber">사건 구분 (의뢰인명(사건명))</label>
-        <input type="text" id="caseNumber" placeholder="예) 홍길동(손해배상)" required />
+
+      <div class="form-section section-schedule">
+        <div class="form-section-title">일정</div>
+        <div class="field">
+          <label for="eventType">일정유형</label>
+          <input type="text" id="eventType" list="typeOptions" placeholder="예) 변론기일" required />
+          <datalist id="typeOptions">
+            <option value="변론기일"></option>
+            <option value="선고기일"></option>
+            <option value="준비기일"></option>
+            <option value="조정기일"></option>
+            <option value="서면제출"></option>
+            <option value="기타"></option>
+          </datalist>
+        </div>
+        <div class="field">
+          <label>날짜 / 시간</label>
+          <div id="dateRows"></div>
+          <button type="button" class="btn-ghost" id="addDateRowBtn" style="margin-top:2px;font-size:12px;padding:6px 10px;">+ 날짜 추가</button>
+        </div>
       </div>
-      <div class="field">
-        <label for="eventType">일정유형</label>
-        <input type="text" id="eventType" list="typeOptions" placeholder="예) 변론기일" required />
-        <datalist id="typeOptions">
-          <option value="변론기일"></option>
-          <option value="선고기일"></option>
-          <option value="준비기일"></option>
-          <option value="조정기일"></option>
-          <option value="서면제출"></option>
-          <option value="기타"></option>
-        </datalist>
+
+      <div class="form-section section-extra">
+        <div class="form-section-title">추가 정보</div>
+        <div class="field">
+          <label for="courtName">법원 (선택)</label>
+          <input type="text" id="courtName" placeholder="예) 서울중앙지방법원" />
+        </div>
+        <div class="field">
+          <label for="memo">메모 (선택)</label>
+          <textarea id="memo" placeholder="참고사항을 적어두세요"></textarea>
+        </div>
       </div>
-      <div class="field">
-        <label>날짜 / 시간</label>
-        <div id="dateRows"></div>
-        <button type="button" class="btn-ghost" id="addDateRowBtn" style="margin-top:2px;font-size:12px;padding:6px 10px;">+ 날짜 추가</button>
-      </div>
-      <div class="field">
-        <label for="courtName">법원 (선택)</label>
-        <input type="text" id="courtName" placeholder="예) 서울중앙지방법원" />
-      </div>
-      <div class="field">
-        <label for="memo">메모 (선택)</label>
-        <textarea id="memo" placeholder="참고사항을 적어두세요"></textarea>
-      </div>
+
       <div class="modal-actions">
         <div>
           <button type="button" class="btn-icon" id="deleteBtn" style="color:var(--danger);display:none;">삭제</button>
