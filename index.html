@@ -280,7 +280,8 @@
   .cal-cell:hover { background: #f7f9fb; }
   .cal-cell.other-month { background: #fafafa; color: #c3c8d0; }
   .cal-cell.today { border-color: var(--navy); border-width: 2px; }
-  .cal-cell.holiday .cal-date-num { color: var(--danger); }
+  .cal-cell.holiday .cal-date-num, .cal-cell.sunday .cal-date-num { color: var(--danger); }
+  .cal-dow.sun { color: var(--danger); }
   .cal-date-num { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
   .holiday-label {
     font-size: 10px;
@@ -573,7 +574,7 @@
     </div>
 
     <div id="caseView" style="display:none;">
-      <input type="text" id="caseSearchInput" placeholder="사건번호 또는 사건명으로 검색" />
+      <input type="text" id="caseSearchInput" placeholder="의뢰인명 또는 사건명으로 검색" />
       <div id="caseGroupList"></div>
     </div>
   </div>
@@ -590,17 +591,11 @@
         <select id="caseNumberPicker">
           <option value="">직접 입력 (신규 사건)</option>
         </select>
-        <div class="field-hint">선택하면 아래 사건번호/사건명/법원이 자동으로 채워집니다.</div>
+        <div class="field-hint">선택하면 아래 사건 구분과 법원이 자동으로 채워집니다.</div>
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="caseNumber">사건번호</label>
-          <input type="text" id="caseNumber" placeholder="예) 2026가단12345" required />
-        </div>
-        <div class="field">
-          <label for="caseTitle">사건명 (선택)</label>
-          <input type="text" id="caseTitle" placeholder="예) 손해배상" />
-        </div>
+      <div class="field">
+        <label for="caseNumber">사건 구분 (의뢰인명(사건명))</label>
+        <input type="text" id="caseNumber" placeholder="예) 홍길동(손해배상)" required />
       </div>
       <div class="field">
         <label for="eventType">일정유형</label>
@@ -748,6 +743,11 @@
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  // 사건번호/사건명이 분리되어 있던 이전 데이터도 "의뢰인명(사건명)" 형태로 통일해서 보여줌
+  function formatCaseLabel(ev) {
+    return ev.caseTitle ? ev.caseNumber + "(" + ev.caseTitle + ")" : ev.caseNumber;
+  }
+
   function renderTodayLabel() {
     var d = new Date();
     var dows = ["일", "월", "화", "수", "목", "금", "토"];
@@ -764,7 +764,7 @@
     else if (diff < 0) row.className += " overdue";
     else if (diff <= 3) row.className += " soon";
 
-    var primaryText = ev.caseNumber + (ev.caseTitle ? " · " + ev.caseTitle : "");
+    var primaryText = formatCaseLabel(ev);
     var subParts = [];
     subParts.push(formatDateHuman(ev.date) + (ev.time ? " " + ev.time : ""));
     if (ev.court) subParts.push(ev.court);
@@ -875,7 +875,9 @@
 
   function renderCalDow() {
     var el = document.getElementById("calDow");
-    el.innerHTML = DOW_LABELS.map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
+    el.innerHTML = DOW_LABELS.map(function (d, i) {
+      return '<div class="cal-dow' + (i === 0 ? " sun" : "") + '">' + d + '</div>';
+    }).join("");
   }
 
   function renderCalendar() {
@@ -900,8 +902,10 @@
       var cellDateStr = cellDate.getFullYear() + "-" + pad(cellDate.getMonth() + 1) + "-" + pad(cellDate.getDate());
       var isOtherMonth = cellDate.getMonth() !== month;
       var holidayName = KR_HOLIDAYS[cellDateStr];
+      var isSunday = cellDate.getDay() === 0;
       var cell = document.createElement("div");
-      cell.className = "cal-cell" + (isOtherMonth ? " other-month" : "") + (cellDateStr === todayS ? " today" : "") + (holidayName ? " holiday" : "");
+      cell.className = "cal-cell" + (isOtherMonth ? " other-month" : "") + (cellDateStr === todayS ? " today" : "") +
+        (holidayName ? " holiday" : "") + (isSunday ? " sunday" : "");
       cell.setAttribute("data-date", cellDateStr);
 
       var dayEvents = (eventsByDate[cellDateStr] || []).slice().sort(function (a, b) {
@@ -916,7 +920,7 @@
       var shown = dayEvents.slice(0, 3);
       shown.forEach(function (ev) {
         html += '<div class="cal-chip" style="background:' + typeColor(ev.type) + (ev.done ? ";opacity:.5" : "") + '">' +
-          escapeHtml(ev.caseNumber + (ev.caseTitle ? " " + ev.caseTitle : "")) + '</div>';
+          escapeHtml(formatCaseLabel(ev)) + '</div>';
       });
       if (dayEvents.length > 3) {
         html += '<div class="cal-more">+' + (dayEvents.length - 3) + '건 더보기</div>';
@@ -979,6 +983,7 @@
       var titleSample = evs.find(function (e) { return e.caseTitle; });
       var pendingCount = evs.filter(function (e) { return !e.done; }).length;
       var latest = evs[evs.length - 1];
+      var groupLabel = formatCaseLabel({ caseNumber: key, caseTitle: titleSample ? titleSample.caseTitle : "" });
 
       var group = document.createElement("div");
       group.className = "case-group";
@@ -986,8 +991,7 @@
       var header = document.createElement("div");
       header.className = "case-group-header";
       header.innerHTML =
-        '<div><span class="case-group-number">' + escapeHtml(key) + '</span>' +
-        (titleSample ? '<span class="case-group-title">' + escapeHtml(titleSample.caseTitle) + '</span>' : '') + '</div>' +
+        '<div><span class="case-group-number">' + escapeHtml(groupLabel) + '</span></div>' +
         '<div class="case-group-meta"><span>진행중 ' + pendingCount + '건</span></div>';
 
       var addBtn = document.createElement("button");
@@ -997,8 +1001,7 @@
       addBtn.textContent = "+ 이 사건에 일정 추가";
       addBtn.addEventListener("click", function () {
         openFormModal({
-          caseNumber: key,
-          caseTitle: titleSample ? titleSample.caseTitle : "",
+          caseNumber: groupLabel,
           type: latest.type,
           court: latest.court,
         });
@@ -1104,7 +1107,7 @@
     summaries.forEach(function (s) {
       var opt = document.createElement("option");
       opt.value = s.caseNumber;
-      opt.textContent = s.caseNumber + (s.caseTitle ? " · " + s.caseTitle : "");
+      opt.textContent = formatCaseLabel(s);
       select.appendChild(opt);
     });
   }
@@ -1125,8 +1128,7 @@
       if (ev) {
         document.getElementById("formTitle").textContent = "일정 수정";
         document.getElementById("eventId").value = ev.id;
-        document.getElementById("caseNumber").value = ev.caseNumber;
-        document.getElementById("caseTitle").value = ev.caseTitle || "";
+        document.getElementById("caseNumber").value = formatCaseLabel(ev);
         document.getElementById("eventType").value = ev.type;
         document.getElementById("courtName").value = ev.court || "";
         document.getElementById("memo").value = ev.memo || "";
@@ -1137,7 +1139,6 @@
     } else {
       document.getElementById("formTitle").textContent = "일정 추가";
       document.getElementById("caseNumber").value = opts.caseNumber || "";
-      document.getElementById("caseTitle").value = opts.caseTitle || "";
       document.getElementById("eventType").value = opts.type || "";
       document.getElementById("courtName").value = opts.court || "";
       document.getElementById("caseNumberPicker").value = opts.caseNumber || "";
@@ -1154,7 +1155,7 @@
     var id = document.getElementById("eventId").value;
     var base = {
       caseNumber: document.getElementById("caseNumber").value.trim(),
-      caseTitle: document.getElementById("caseTitle").value.trim(),
+      caseTitle: "",
       type: document.getElementById("eventType").value.trim(),
       court: document.getElementById("courtName").value.trim(),
       memo: document.getElementById("memo").value.trim(),
@@ -1322,8 +1323,7 @@
       if (!this.value) return;
       var summary = getCaseSummaries().find(function (s) { return s.caseNumber === this.value; }, this);
       if (!summary) return;
-      document.getElementById("caseNumber").value = summary.caseNumber;
-      document.getElementById("caseTitle").value = summary.caseTitle;
+      document.getElementById("caseNumber").value = formatCaseLabel(summary);
       if (summary.court) document.getElementById("courtName").value = summary.court;
     });
 
