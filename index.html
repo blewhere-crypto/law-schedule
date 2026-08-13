@@ -563,7 +563,7 @@
   #dayModal .day-event-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 
   @media (max-width: 560px) {
-    .cal-cell { min-height: 60px; }
+    .cal-cell { min-height: 72px; }
     .cal-chip { display: none; }
     .cal-cell.has-events::after {
       content: "";
@@ -577,6 +577,18 @@
     .event-actions { margin-left: auto; }
     .event-main { flex-basis: 100%; }
     .event-case, .event-sub { white-space: normal; }
+
+    /* 세로로 긴(21:9 등) 화면에서는 목록 안에 또 스크롤이 생기면 손가락으로
+       어디가 스크롤되는지 헷갈리기 쉬워서, 카드 내부 스크롤을 없애고
+       페이지 전체가 하나로 스크롤되게 합니다. */
+    #urgentList { max-height: none; overflow-y: visible; }
+  }
+
+  /* 세로로 아주 긴 화면(21:9 등)에서 캘린더/카드에 여유 공간을 더 준다 */
+  @media (max-width: 560px) and (min-height: 780px) {
+    .cal-cell { min-height: 84px; }
+    .card { padding: 20px 18px 10px; }
+    .stat-tile { padding: 18px 12px; }
   }
 </style>
 </head>
