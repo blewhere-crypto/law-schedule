@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>일정관리 · 변호사 대시보드</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="theme-color" content="#1e3a5f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="일정관리" />
+<style>
+  :root {
+    --navy: #1e3a5f;
+    --navy-dark: #142943;
+    --bg: #f2f4f7;
+    --card: #ffffff;
+    --border: #e2e6ec;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --warn: #d97706;
+    --warn-bg: #fffbeb;
+    --ok: #16a34a;
+    --type-변론기일: #2563eb;
+    --type-선고기일: #7c3aed;
+    --type-조정기일: #0d9488;
+    --type-준비기일: #0284c7;
+    --type-서면제출: #dc2626;
+    --type-기타: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 22px;
+    margin: 0;
+    color: var(--navy-dark);
+  }
+  header .today-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn-primary {
+    background: var(--navy);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--navy-dark); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--navy);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .btn-ghost:hover { background: #eef1f5; }
+  .btn-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .btn-icon:hover { background: #eef1f5; color: var(--text); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 18px 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card-header h2 {
+    font-size: 15px;
+    margin: 0;
+    color: var(--navy-dark);
+  }
+  .toggle-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  /* 탭 */
+  .view-tabs { display: flex; gap: 6px; }
+  .tab-btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 100px;
+    cursor: pointer;
+  }
+  .tab-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  /* 이벤트 목록 (공통) */
+  #urgentList, .case-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #urgentList { max-height: 360px; overflow-y: auto; padding-bottom: 10px; }
+  .empty-msg {
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px 4px;
+    text-align: center;
+  }
+  .event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fafbfc;
+  }
+  .event-row.overdue { background: var(--danger-bg); border-color: #fecaca; }
+  .event-row.soon { background: var(--warn-bg); border-color: #fde68a; }
+  .event-row.done { opacity: 0.55; }
+  .dday-badge {
+    flex: 0 0 auto;
+    min-width: 52px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 6px;
+    border-radius: 6px;
+    background: var(--navy);
+    color: #fff;
+  }
+  .event-row.overdue .dday-badge { background: var(--danger); }
+  .event-row.soon .dday-badge { background: var(--warn); }
+  .type-badge {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 100px;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .event-main { flex: 1 1 auto; min-width: 0; }
+  .event-case {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .event-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .event-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+  input[type="checkbox"].done-check {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--ok);
+  }
+
+  /* 캘린더 */
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .cal-nav .month-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--navy-dark);
+    min-width: 96px;
+    text-align: center;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .cal-dow {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 4px 0 8px;
+    font-weight: 600;
+  }
+  .cal-cell {
+    min-height: 78px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 5px 4px;
+    cursor: pointer;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cal-cell:hover { background: #f7f9fb; }
+  .cal-cell.other-month { background: #fafafa; color: #c3c8d0; }
+  .cal-cell.today { border-color: var(--navy); border-width: 2px; }
+  .cal-date-num { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .cal-chip {
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-more { font-size: 10px; color: var(--text-muted); padding-left: 2px; }
+
+  /* 사건별 보기 */
+  #caseSearchInput {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 14px;
+    font-family: inherit;
+  }
+  .case-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .case-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f7f9fb;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .case-group-number { font-weight: 700; font-size: 13.5px; color: var(--navy-dark); }
+  .case-group-title { font-size: 12.5px; color: var(--text-muted); margin-left: 4px; }
+  .case-group-meta {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .case-group-list { padding: 10px 12px; }
+
+  /* 모달 */
+  #modalOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 16px;
+  }
+  #modalOverlay.open { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 440px;
+    padding: 22px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h3 { margin: 0 0 16px; font-size: 17px; color: var(--navy-dark); }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .field input[type="text"],
+  .field input[type="date"],
+  .field input[type="time"],
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .field select { max-height: 200px; }
+  .field textarea { resize: vertical; min-height: 56px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field { flex: 1; }
+  .field-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+  .date-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .date-row input[type="date"] {
+    flex: 1.3;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+  }
+  .date-row input[type="time"] {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+  }
+  .date-row .remove-row-btn { flex: 0 0 auto; font-size: 18px; line-height: 1; }
+
+  .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    gap: 8px;
+  }
+  .modal-actions .right { display: flex; gap: 8px; }
+
+  #dayModal .day-event-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+  @media (max-width: 560px) {
+    .cal-cell { min-height: 60px; }
+    .cal-chip { display: none; }
+    .cal-cell.has-events::after {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--navy);
+      align-self: center;
+    }
+    .event-row { flex-wrap: wrap; row-gap: 6px; }
+    .event-actions { margin-left: auto; }
+    .event-main { flex-basis: 100%; }
+    .event-case, .event-sub { white-space: normal; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>일정관리</h1>
+      <div class="today-label" id="todayLabel"></div>
+    </div>
+    <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
+  </header>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>중요 일정</h2>
+      <label class="toggle-label">
+        <input type="checkbox" id="showDoneToggle" />
+        완료된 일정도 보기
+      </label>
+    </div>
+    <div id="urgentList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>일정 보기</h2>
+      <div class="view-tabs">
+        <button type="button" class="tab-btn active" id="tabCalendar">캘린더</button>
+        <button type="button" class="tab-btn" id="tabByCase">사건별(의뢰인)</button>
+      </div>
+    </div>
+
+    <div id="calendarView">
+      <div class="cal-nav">
+        <button class="btn-icon" id="prevMonth">‹</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button class="btn-icon" id="nextMonth">›</button>
+        <button class="btn-ghost" id="todayBtn" style="padding:6px 10px;font-size:12px;">오늘</button>
+      </div>
+      <div class="cal-grid" id="calDow"></div>
+      <div class="cal-grid" id="calGrid" style="margin-bottom:14px;"></div>
+    </div>
+
+    <div id="caseView" style="display:none;">
+      <input type="text" id="caseSearchInput" placeholder="사건번호 또는 사건명으로 검색" />
+      <div id="caseGroupList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 일정 추가/수정 모달 -->
+<div id="modalOverlay">
+  <div class="modal" id="formModal">
+    <h3 id="formTitle">일정 추가</h3>
+    <form id="eventForm">
+      <input type="hidden" id="eventId" />
+      <div class="field" id="caseNumberPickerField">
+        <label for="caseNumberPicker">기존 사건에서 선택 (선택사항)</label>
+        <select id="caseNumberPicker">
+          <option value="">직접 입력 (신규 사건)</option>
+        </select>
+        <div class="field-hint">선택하면 아래 사건번호/사건명/법원이 자동으로 채워집니다.</div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="caseNumber">사건번호</label>
+          <input type="text" id="caseNumber" placeholder="예) 2026가단12345" required />
+        </div>
+        <div class="field">
+          <label for="caseTitle">사건명 (선택)</label>
+          <input type="text" id="caseTitle" placeholder="예) 손해배상" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="eventType">일정유형</label>
+        <input type="text" id="eventType" list="typeOptions" placeholder="예) 변론기일" required />
+        <datalist id="typeOptions">
+          <option value="변론기일"></option>
+          <option value="선고기일"></option>
+          <option value="준비기일"></option>
+          <option value="조정기일"></option>
+          <option value="서면제출"></option>
+          <option value="기타"></option>
+        </datalist>
+      </div>
+      <div class="field">
+        <label>날짜 / 시간</label>
+        <div id="dateRows"></div>
+        <button type="button" class="btn-ghost" id="addDateRowBtn" style="margin-top:2px;font-size:12px;padding:6px 10px;">+ 날짜 추가</button>
+      </div>
+      <div class="field">
+        <label for="courtName">법원 (선택)</label>
+        <input type="text" id="courtName" placeholder="예) 서울중앙지방법원" />
+      </div>
+      <div class="field">
+        <label for="memo">메모 (선택)</label>
+        <textarea id="memo" placeholder="참고사항을 적어두세요"></textarea>
+      </div>
+      <div class="modal-actions">
+        <div>
+          <button type="button" class="btn-icon" id="deleteBtn" style="color:var(--danger);display:none;">삭제</button>
+        </div>
+        <div class="right">
+          <button type="button" class="btn-ghost" id="cancelBtn" style="padding:10px 16px;font-size:14px;font-weight:600;">취소</button>
+          <button type="submit" class="btn-primary btn">저장</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 날짜 클릭 시 해당일 일정 목록 모달 -->
+<div id="dayModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);align-items:center;justify-content:center;z-index:40;padding:16px;">
+  <div class="modal" id="dayModal">
+    <h3 id="dayModalTitle">일정</h3>
+    <div class="day-event-list" id="dayEventList"></div>
+    <div class="modal-actions">
+      <div></div>
+      <div class="right">
+        <button type="button" class="btn-ghost" id="dayModalClose" style="padding:10px 16px;font-size:14px;font-weight:600;">닫기</button>
+        <button type="button" class="btn-primary btn" id="dayModalAdd">+ 이 날짜에 추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "lawScheduleEvents_v1";
+  var TYPE_COLOR_VAR = {
+    "변론기일": "var(--type-변론기일)",
+    "선고기일": "var(--type-선고기일)",
+    "조정기일": "var(--type-조정기일)",
+    "준비기일": "var(--type-준비기일)",
+    "서면제출": "var(--type-서면제출)",
+  };
+  function typeColor(type) { return TYPE_COLOR_VAR[type] || "var(--type-기타)"; }
+
+  var state = {
+    events: [],
+    calYear: null,
+    calMonth: null, // 0-11
+    showDone: false,
+    dayModalDate: null,
+    activeView: "calendar", // "calendar" | "case"
+  };
+
+  function loadEvents() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      state.events = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      state.events = [];
+    }
+    // 이전 버전 데이터(사건명/사건번호 통합 필드) 마이그레이션
+    state.events.forEach(function (ev) {
+      if (ev.caseNumber === undefined) {
+        ev.caseNumber = ev.caseName || "";
+        ev.caseTitle = "";
+        delete ev.caseName;
+      }
+    });
+  }
+  function saveEvents() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events)); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function parseDate(s) {
+    var parts = s.split("-");
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }
+  function diffDaysFromToday(dateStr) {
+    var today = parseDate(todayStr());
+    var target = parseDate(dateStr);
+    return Math.round((target - today) / 86400000);
+  }
+  function ddayLabel(diff) {
+    if (diff === 0) return "D-DAY";
+    if (diff > 0) return "D-" + diff;
+    return "D+" + (-diff);
+  }
+  function formatDateHuman(dateStr) {
+    var d = parseDate(dateStr);
+    var dows = ["일", "월", "화", "수", "목", "금", "토"];
+    return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + dows[d.getDay()] + ")";
+  }
+  function escapeHtml(s) {
+    if (!s) return "";
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function renderTodayLabel() {
+    var d = new Date();
+    var dows = ["일", "월", "화", "수", "목", "금", "토"];
+    document.getElementById("todayLabel").textContent =
+      d.getFullYear() + "년 " + (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + dows[d.getDay()] + ") 오늘";
+  }
+
+  // ---------- 이벤트 행 (공통 렌더러) ----------
+  function buildEventRowEl(ev) {
+    var diff = diffDaysFromToday(ev.date);
+    var row = document.createElement("div");
+    row.className = "event-row";
+    if (ev.done) row.className += " done";
+    else if (diff < 0) row.className += " overdue";
+    else if (diff <= 3) row.className += " soon";
+
+    var primaryText = ev.caseNumber + (ev.caseTitle ? " · " + ev.caseTitle : "");
+    var subParts = [];
+    subParts.push(formatDateHuman(ev.date) + (ev.time ? " " + ev.time : ""));
+    if (ev.court) subParts.push(ev.court);
+    if (ev.memo) subParts.push(ev.memo);
+
+    row.innerHTML =
+      '<input type="checkbox" class="done-check" ' + (ev.done ? "checked" : "") + ' />' +
+      '<div class="dday-badge">' + ddayLabel(diff) + '</div>' +
+      '<div class="type-badge" style="background:' + typeColor(ev.type) + '">' + escapeHtml(ev.type) + '</div>' +
+      '<div class="event-main">' +
+        '<div class="event-case">' + escapeHtml(primaryText) + '</div>' +
+        '<div class="event-sub">' + escapeHtml(subParts.join(" · ")) + '</div>' +
+      '</div>' +
+      '<div class="event-actions"><button type="button" class="btn-icon edit-btn" title="수정">✎</button></div>';
+
+    row.querySelector(".done-check").addEventListener("change", function () {
+      toggleDone(ev.id, this.checked);
+    });
+    row.querySelector(".edit-btn").addEventListener("click", function () {
+      openFormModal({ editId: ev.id });
+    });
+    return row;
+  }
+
+  function toggleDone(id, done) {
+    var ev = state.events.find(function (e) { return e.id === id; });
+    if (!ev) return;
+    ev.done = done;
+    saveEvents();
+    renderAll();
+  }
+
+  // ---------- 중요 일정 ----------
+  function renderUrgentList() {
+    var list = document.getElementById("urgentList");
+    var items = state.events.filter(function (e) { return state.showDone || !e.done; });
+    items.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.time || "").localeCompare(b.time || "");
+    });
+
+    list.innerHTML = "";
+    if (items.length === 0) {
+      list.innerHTML = '<div class="empty-msg">등록된 일정이 없습니다. 상단의 "+ 일정 추가" 버튼으로 등록해보세요.</div>';
+      return;
+    }
+    items.forEach(function (ev) { list.appendChild(buildEventRowEl(ev)); });
+  }
+
+  // ---------- 캘린더 ----------
+  var DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+  function renderCalDow() {
+    var el = document.getElementById("calDow");
+    el.innerHTML = DOW_LABELS.map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join("");
+  }
+
+  function renderCalendar() {
+    var year = state.calYear, month = state.calMonth;
+    document.getElementById("monthLabel").textContent = year + "년 " + (month + 1) + "월";
+
+    var eventsByDate = {};
+    state.events.forEach(function (ev) {
+      (eventsByDate[ev.date] = eventsByDate[ev.date] || []).push(ev);
+    });
+
+    var firstOfMonth = new Date(year, month, 1);
+    var startDow = firstOfMonth.getDay();
+    var gridStart = new Date(year, month, 1 - startDow);
+
+    var grid = document.getElementById("calGrid");
+    grid.innerHTML = "";
+    var todayS = todayStr();
+
+    for (var i = 0; i < 42; i++) {
+      var cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      var cellDateStr = cellDate.getFullYear() + "-" + pad(cellDate.getMonth() + 1) + "-" + pad(cellDate.getDate());
+      var isOtherMonth = cellDate.getMonth() !== month;
+      var cell = document.createElement("div");
+      cell.className = "cal-cell" + (isOtherMonth ? " other-month" : "") + (cellDateStr === todayS ? " today" : "");
+      cell.setAttribute("data-date", cellDateStr);
+
+      var dayEvents = (eventsByDate[cellDateStr] || []).slice().sort(function (a, b) {
+        return (a.time || "").localeCompare(b.time || "");
+      });
+      if (dayEvents.length > 0) cell.className += " has-events";
+
+      var html = '<div class="cal-date-num">' + cellDate.getDate() + '</div>';
+      var shown = dayEvents.slice(0, 3);
+      shown.forEach(function (ev) {
+        html += '<div class="cal-chip" style="background:' + typeColor(ev.type) + (ev.done ? ";opacity:.5" : "") + '">' +
+          escapeHtml(ev.caseNumber + (ev.caseTitle ? " " + ev.caseTitle : "")) + '</div>';
+      });
+      if (dayEvents.length > 3) {
+        html += '<div class="cal-more">+' + (dayEvents.length - 3) + '건 더보기</div>';
+      }
+      cell.innerHTML = html;
+      cell.addEventListener("click", function () { openDayModal(this.getAttribute("data-date")); });
+      grid.appendChild(cell);
+    }
+  }
+
+  function changeMonth(delta) {
+    var d = new Date(state.calYear, state.calMonth + delta, 1);
+    state.calYear = d.getFullYear();
+    state.calMonth = d.getMonth();
+    renderCalendar();
+  }
+
+  // ---------- 사건별 보기 ----------
+  function nearestUpcomingDiff(evs) {
+    var pending = evs.filter(function (e) { return !e.done; }).map(function (e) { return diffDaysFromToday(e.date); });
+    if (pending.length === 0) return null;
+    return Math.min.apply(null, pending);
+  }
+
+  function renderCaseView() {
+    var query = document.getElementById("caseSearchInput").value.trim().toLowerCase();
+    var groups = {};
+    state.events.forEach(function (ev) {
+      var key = ev.caseNumber || "(사건번호 없음)";
+      (groups[key] = groups[key] || []).push(ev);
+    });
+    var keys = Object.keys(groups);
+    if (query) {
+      keys = keys.filter(function (k) {
+        var titleMatch = groups[k].some(function (ev) { return (ev.caseTitle || "").toLowerCase().indexOf(query) !== -1; });
+        return k.toLowerCase().indexOf(query) !== -1 || titleMatch;
+      });
+    }
+    keys.sort(function (a, b) {
+      var na = nearestUpcomingDiff(groups[a]);
+      var nb = nearestUpcomingDiff(groups[b]);
+      if (na === null && nb === null) return a.localeCompare(b);
+      if (na === null) return 1;
+      if (nb === null) return -1;
+      return na - nb;
+    });
+
+    var container = document.getElementById("caseGroupList");
+    container.innerHTML = "";
+    if (keys.length === 0) {
+      container.innerHTML = '<div class="empty-msg">' + (query ? "검색 결과가 없습니다." : "등록된 사건이 없습니다.") + '</div>';
+      return;
+    }
+
+    keys.forEach(function (key) {
+      var evs = groups[key].slice().sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return (a.time || "").localeCompare(b.time || "");
+      });
+      var titleSample = evs.find(function (e) { return e.caseTitle; });
+      var pendingCount = evs.filter(function (e) { return !e.done; }).length;
+      var latest = evs[evs.length - 1];
+
+      var group = document.createElement("div");
+      group.className = "case-group";
+
+      var header = document.createElement("div");
+      header.className = "case-group-header";
+      header.innerHTML =
+        '<div><span class="case-group-number">' + escapeHtml(key) + '</span>' +
+        (titleSample ? '<span class="case-group-title">' + escapeHtml(titleSample.caseTitle) + '</span>' : '') + '</div>' +
+        '<div class="case-group-meta"><span>진행중 ' + pendingCount + '건</span></div>';
+
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn-ghost";
+      addBtn.style.cssText = "font-size:11px;padding:4px 10px;";
+      addBtn.textContent = "+ 이 사건에 일정 추가";
+      addBtn.addEventListener("click", function () {
+        openFormModal({
+          caseNumber: key,
+          caseTitle: titleSample ? titleSample.caseTitle : "",
+          type: latest.type,
+          court: latest.court,
+        });
+      });
+      header.querySelector(".case-group-meta").appendChild(addBtn);
+
+      var listEl = document.createElement("div");
+      listEl.className = "case-group-list";
+      evs.forEach(function (ev) { listEl.appendChild(buildEventRowEl(ev)); });
+
+      group.appendChild(header);
+      group.appendChild(listEl);
+      container.appendChild(group);
+    });
+  }
+
+  function switchView(view) {
+    state.activeView = view;
+    var isCal = view === "calendar";
+    document.getElementById("calendarView").style.display = isCal ? "" : "none";
+    document.getElementById("caseView").style.display = isCal ? "none" : "";
+    document.getElementById("tabCalendar").classList.toggle("active", isCal);
+    document.getElementById("tabByCase").classList.toggle("active", !isCal);
+    if (!isCal) renderCaseView();
+  }
+
+  // ---------- 일자별 모달 ----------
+  function openDayModal(dateStr) {
+    state.dayModalDate = dateStr;
+    document.getElementById("dayModalTitle").textContent = formatDateHuman(dateStr) + " 일정";
+    var list = document.getElementById("dayEventList");
+    var dayEvents = state.events.filter(function (e) { return e.date === dateStr; })
+      .sort(function (a, b) { return (a.time || "").localeCompare(b.time || ""); });
+
+    list.innerHTML = "";
+    if (dayEvents.length === 0) {
+      list.innerHTML = '<div class="empty-msg">이 날짜에 등록된 일정이 없습니다.</div>';
+    } else {
+      dayEvents.forEach(function (ev) { list.appendChild(buildEventRowEl(ev)); });
+    }
+    document.getElementById("dayModalOverlay").style.display = "flex";
+  }
+  function closeDayModal() { document.getElementById("dayModalOverlay").style.display = "none"; }
+
+  // ---------- 날짜/시간 다중 입력 행 ----------
+  function createDateRow(dateVal, timeVal) {
+    var row = document.createElement("div");
+    row.className = "date-row";
+    row.innerHTML =
+      '<input type="date" class="row-date" required />' +
+      '<input type="time" class="row-time" />' +
+      '<button type="button" class="btn-icon remove-row-btn">×</button>';
+    row.querySelector(".row-date").value = dateVal || "";
+    row.querySelector(".row-time").value = timeVal || "";
+    row.querySelector(".remove-row-btn").addEventListener("click", function () {
+      if (document.querySelectorAll("#dateRows .date-row").length > 1) {
+        row.remove();
+        updateRemoveButtonsVisibility();
+      }
+    });
+    return row;
+  }
+  function updateRemoveButtonsVisibility() {
+    var rows = document.querySelectorAll("#dateRows .date-row");
+    rows.forEach(function (r) {
+      r.querySelector(".remove-row-btn").style.visibility = rows.length > 1 ? "visible" : "hidden";
+    });
+  }
+  function addDateRow(dateVal, timeVal) {
+    document.getElementById("dateRows").appendChild(createDateRow(dateVal, timeVal));
+    updateRemoveButtonsVisibility();
+  }
+  function clearDateRows() { document.getElementById("dateRows").innerHTML = ""; }
+  function collectDateRows() {
+    var rows = document.querySelectorAll("#dateRows .date-row");
+    var result = [];
+    rows.forEach(function (r) {
+      var d = r.querySelector(".row-date").value;
+      var t = r.querySelector(".row-time").value;
+      if (d) result.push({ date: d, time: t });
+    });
+    return result;
+  }
+
+  // ---------- 기존 사건 선택 드롭다운 ----------
+  function getCaseSummaries() {
+    var map = {};
+    state.events.forEach(function (ev) {
+      if (!ev.caseNumber) return;
+      if (!map[ev.caseNumber]) {
+        map[ev.caseNumber] = { caseNumber: ev.caseNumber, caseTitle: ev.caseTitle || "", court: ev.court || "" };
+      } else if (!map[ev.caseNumber].caseTitle && ev.caseTitle) {
+        map[ev.caseNumber].caseTitle = ev.caseTitle;
+      }
+    });
+    return Object.keys(map).sort(function (a, b) { return a.localeCompare(b); }).map(function (k) { return map[k]; });
+  }
+
+  function refreshCaseNumberPicker() {
+    var select = document.getElementById("caseNumberPicker");
+    var summaries = getCaseSummaries();
+    select.innerHTML = '<option value="">직접 입력 (신규 사건)</option>';
+    summaries.forEach(function (s) {
+      var opt = document.createElement("option");
+      opt.value = s.caseNumber;
+      opt.textContent = s.caseNumber + (s.caseTitle ? " · " + s.caseTitle : "");
+      select.appendChild(opt);
+    });
+  }
+
+  // ---------- 추가/수정 모달 ----------
+  function openFormModal(opts) {
+    opts = opts || {};
+    var form = document.getElementById("eventForm");
+    form.reset();
+    document.getElementById("eventId").value = "";
+    document.getElementById("deleteBtn").style.display = "none";
+    clearDateRows();
+    refreshCaseNumberPicker();
+    document.getElementById("caseNumberPickerField").style.display = opts.editId ? "none" : "";
+
+    if (opts.editId) {
+      var ev = state.events.find(function (e) { return e.id === opts.editId; });
+      if (ev) {
+        document.getElementById("formTitle").textContent = "일정 수정";
+        document.getElementById("eventId").value = ev.id;
+        document.getElementById("caseNumber").value = ev.caseNumber;
+        document.getElementById("caseTitle").value = ev.caseTitle || "";
+        document.getElementById("eventType").value = ev.type;
+        document.getElementById("courtName").value = ev.court || "";
+        document.getElementById("memo").value = ev.memo || "";
+        document.getElementById("deleteBtn").style.display = "inline-block";
+        document.getElementById("addDateRowBtn").style.display = "none";
+        addDateRow(ev.date, ev.time);
+      }
+    } else {
+      document.getElementById("formTitle").textContent = "일정 추가";
+      document.getElementById("caseNumber").value = opts.caseNumber || "";
+      document.getElementById("caseTitle").value = opts.caseTitle || "";
+      document.getElementById("eventType").value = opts.type || "";
+      document.getElementById("courtName").value = opts.court || "";
+      document.getElementById("caseNumberPicker").value = opts.caseNumber || "";
+      document.getElementById("addDateRowBtn").style.display = "inline-block";
+      addDateRow(opts.date || todayStr(), "");
+    }
+    updateRemoveButtonsVisibility();
+    document.getElementById("modalOverlay").classList.add("open");
+  }
+  function closeFormModal() { document.getElementById("modalOverlay").classList.remove("open"); }
+
+  function submitForm(e) {
+    e.preventDefault();
+    var id = document.getElementById("eventId").value;
+    var base = {
+      caseNumber: document.getElementById("caseNumber").value.trim(),
+      caseTitle: document.getElementById("caseTitle").value.trim(),
+      type: document.getElementById("eventType").value.trim(),
+      court: document.getElementById("courtName").value.trim(),
+      memo: document.getElementById("memo").value.trim(),
+    };
+    if (!base.caseNumber || !base.type) return;
+    var rows = collectDateRows();
+    if (rows.length === 0) return;
+
+    if (id) {
+      var ev = state.events.find(function (e2) { return e2.id === id; });
+      if (ev) {
+        Object.assign(ev, base);
+        ev.date = rows[0].date;
+        ev.time = rows[0].time;
+      }
+    } else {
+      rows.forEach(function (r) {
+        state.events.push(Object.assign({}, base, { id: uid(), date: r.date, time: r.time, done: false }));
+      });
+    }
+    saveEvents();
+    closeFormModal();
+    renderAll();
+  }
+
+  function deleteCurrentEvent() {
+    var id = document.getElementById("eventId").value;
+    if (!id) return;
+    if (!confirm("이 일정을 삭제할까요?")) return;
+    state.events = state.events.filter(function (e) { return e.id !== id; });
+    saveEvents();
+    closeFormModal();
+    renderAll();
+  }
+
+  function renderAll() {
+    renderUrgentList();
+    renderCalendar();
+    if (state.activeView === "case") renderCaseView();
+  }
+
+  // ---------- 초기화 ----------
+  function init() {
+    loadEvents();
+    var now = new Date();
+    state.calYear = now.getFullYear();
+    state.calMonth = now.getMonth();
+
+    renderTodayLabel();
+    renderCalDow();
+    renderAll();
+
+    document.getElementById("addBtn").addEventListener("click", function () { openFormModal({}); });
+    document.getElementById("cancelBtn").addEventListener("click", closeFormModal);
+    document.getElementById("modalOverlay").addEventListener("click", function (e) { if (e.target === this) closeFormModal(); });
+    document.getElementById("eventForm").addEventListener("submit", submitForm);
+    document.getElementById("deleteBtn").addEventListener("click", deleteCurrentEvent);
+    document.getElementById("addDateRowBtn").addEventListener("click", function () { addDateRow("", ""); });
+    document.getElementById("caseNumberPicker").addEventListener("change", function () {
+      if (!this.value) return;
+      var summary = getCaseSummaries().find(function (s) { return s.caseNumber === this.value; }, this);
+      if (!summary) return;
+      document.getElementById("caseNumber").value = summary.caseNumber;
+      document.getElementById("caseTitle").value = summary.caseTitle;
+      if (summary.court) document.getElementById("courtName").value = summary.court;
+    });
+
+    document.getElementById("prevMonth").addEventListener("click", function () { changeMonth(-1); });
+    document.getElementById("nextMonth").addEventListener("click", function () { changeMonth(1); });
+    document.getElementById("todayBtn").addEventListener("click", function () {
+      var n = new Date();
+      state.calYear = n.getFullYear();
+      state.calMonth = n.getMonth();
+      renderCalendar();
+    });
+
+    document.getElementById("showDoneToggle").addEventListener("change", function () {
+      state.showDone = this.checked;
+      renderUrgentList();
+    });
+
+    document.getElementById("tabCalendar").addEventListener("click", function () { switchView("calendar"); });
+    document.getElementById("tabByCase").addEventListener("click", function () { switchView("case"); });
+    document.getElementById("caseSearchInput").addEventListener("input", renderCaseView);
+
+    document.getElementById("dayModalClose").addEventListener("click", closeDayModal);
+    document.getElementById("dayModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeDayModal(); });
+    document.getElementById("dayModalAdd").addEventListener("click", function () {
+      var d = state.dayModalDate;
+      closeDayModal();
+      openFormModal({ date: d });
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
