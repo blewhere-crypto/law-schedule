@@ -943,6 +943,12 @@
         '<button type="button" class="btn-icon edit-btn" title="수정">✎</button>' +
       '</div>';
 
+    row.style.cursor = "pointer";
+    row.addEventListener("click", function () {
+      openFormModal({ editId: ev.id });
+    });
+
+    row.querySelector(".done-check").addEventListener("click", function (e) { e.stopPropagation(); });
     row.querySelector(".done-check").addEventListener("change", function () {
       toggleDone(ev.id, this.checked);
     });
@@ -950,7 +956,8 @@
       e.stopPropagation();
       addEventToNaverCalendar(ev, this);
     });
-    row.querySelector(".edit-btn").addEventListener("click", function () {
+    row.querySelector(".edit-btn").addEventListener("click", function (e) {
+      e.stopPropagation();
       openFormModal({ editId: ev.id });
     });
     return row;
