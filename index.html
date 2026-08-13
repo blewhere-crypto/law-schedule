@@ -447,19 +447,34 @@
   }
   .auth-msg.error { display: block; color: var(--danger); background: var(--danger-bg); }
   .auth-msg.info { display: block; color: var(--navy-dark); background: #eef2f7; }
-  .header-user {
+  .utility-bar {
     display: flex;
+    justify-content: flex-end;
     align-items: center;
     gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
   }
-  .header-user .user-email {
-    font-size: 12px;
+  .utility-bar .user-email {
+    font-size: 11px;
     color: var(--text-muted);
-    max-width: 160px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 3px 2px;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+  .link-btn:hover { color: var(--text); }
+  .link-btn[data-connected="1"] { color: #03c75a; text-decoration: none; font-weight: 700; }
 
   /* 모달 */
   #modalOverlay {
@@ -647,17 +662,17 @@
 </div>
 
 <div class="app" id="appRoot" style="display:none;">
+  <div class="utility-bar">
+    <span class="user-email" id="userEmailLabel"></span>
+    <button type="button" class="link-btn" id="naverConnectBtn">네이버 연결</button>
+    <button type="button" class="link-btn" id="logoutBtn">로그아웃</button>
+  </div>
   <header>
     <div>
       <h1>일정관리</h1>
       <div class="today-label" id="todayLabel"></div>
     </div>
-    <div class="header-user">
-      <span class="user-email" id="userEmailLabel"></span>
-      <button class="btn-ghost" id="naverConnectBtn" style="padding:6px 10px;font-size:12px;">네이버 캘린더 연결</button>
-      <button class="btn-ghost" id="logoutBtn" style="padding:6px 10px;font-size:12px;">로그아웃</button>
-      <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
-    </div>
+    <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
   </header>
 
   <div class="stats-row" id="statsRow">
@@ -986,7 +1001,7 @@
 
   function updateNaverConnectBtn(connected) {
     var btn = document.getElementById("naverConnectBtn");
-    btn.textContent = connected ? "네이버 캘린더 연결됨 (해제)" : "네이버 캘린더 연결";
+    btn.textContent = connected ? "네이버 연결됨" : "네이버 연결";
     btn.dataset.connected = connected ? "1" : "";
   }
 
