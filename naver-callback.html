@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>네이버 캘린더 연결</title>
+</head>
+<body style="font-family:sans-serif; padding:24px; color:#374151;">
+<p id="msg">처리 중입니다...</p>
+<script>
+  var params = new URLSearchParams(window.location.search);
+  var payload = {
+    source: "naver-oauth",
+    code: params.get("code"),
+    state: params.get("state"),
+    error: params.get("error"),
+  };
+  if (window.opener) {
+    window.opener.postMessage(payload, window.location.origin);
+    document.getElementById("msg").textContent = payload.error
+      ? "연동이 취소되었습니다. 이 창을 닫아주세요."
+      : "연동 처리 중입니다. 이 창은 자동으로 닫힙니다...";
+    window.close();
+  } else {
+    document.getElementById("msg").textContent = "이 페이지는 네이버 로그인 연동 팝업 전용입니다.";
+  }
+</script>
+</body>
+</html>
