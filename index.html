@@ -128,6 +128,30 @@
     user-select: none;
   }
 
+  /* 대시보드 요약 */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat-tile {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  }
+  .stat-num { font-size: 26px; font-weight: 800; color: var(--navy-dark); line-height: 1.1; }
+  .stat-label { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+  .stat-tile.accent-today .stat-num { color: var(--danger); }
+  .stat-tile.accent-week .stat-num { color: var(--warn); }
+  .stat-tile.accent-case .stat-num { color: var(--type-조정기일); }
+  @media (max-width: 480px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
   /* 탭 */
   .view-tabs { display: flex; gap: 6px; }
   .tab-btn {
@@ -488,6 +512,25 @@
       <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
     </div>
   </header>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-tile">
+      <div class="stat-num" id="statTotal">0</div>
+      <div class="stat-label">전체 일정</div>
+    </div>
+    <div class="stat-tile accent-today">
+      <div class="stat-num" id="statToday">0</div>
+      <div class="stat-label">오늘 할 일</div>
+    </div>
+    <div class="stat-tile accent-week">
+      <div class="stat-num" id="statWeek">0</div>
+      <div class="stat-label">1주일 이내</div>
+    </div>
+    <div class="stat-tile accent-case">
+      <div class="stat-num" id="statCases">0</div>
+      <div class="stat-label">진행 사건수</div>
+    </div>
+  </div>
 
   <div class="card">
     <div class="card-header">
@@ -1092,7 +1135,25 @@
     await refreshEventsFromServer();
   }
 
+  function renderStats() {
+    var pending = state.events.filter(function (e) { return !e.done; });
+    var today = todayStr();
+    var todayCount = pending.filter(function (e) { return e.date === today; }).length;
+    var weekCount = pending.filter(function (e) {
+      var diff = diffDaysFromToday(e.date);
+      return diff >= 0 && diff <= 7;
+    }).length;
+    var caseSet = {};
+    pending.forEach(function (e) { if (e.caseNumber) caseSet[e.caseNumber] = true; });
+
+    document.getElementById("statTotal").textContent = pending.length;
+    document.getElementById("statToday").textContent = todayCount;
+    document.getElementById("statWeek").textContent = weekCount;
+    document.getElementById("statCases").textContent = Object.keys(caseSet).length;
+  }
+
   function renderAll() {
+    renderStats();
     renderUrgentList();
     renderCalendar();
     if (state.activeView === "case") renderCaseView();
