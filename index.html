@@ -258,10 +258,40 @@
   }
   .event-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
   input[type="checkbox"].done-check {
-    width: 18px;
-    height: 18px;
+    width: 21px;
+    height: 21px;
     cursor: pointer;
     accent-color: var(--ok);
+  }
+
+  .undo-toast {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: var(--navy-dark);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    align-items: center;
+    gap: 12px;
+    z-index: 200;
+    font-size: 13px;
+    max-width: 90vw;
+  }
+  .undo-toast.show { display: flex; }
+  .undo-toast button {
+    background: #fff;
+    color: var(--navy-dark);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
   }
 
   /* 캘린더 */
@@ -586,6 +616,11 @@
     </div>
     <button type="button" class="btn-primary btn" id="recoverySubmitBtn" style="width:100%;">비밀번호 변경</button>
   </div>
+</div>
+
+<div id="undoToast" class="undo-toast">
+  <span id="undoToastMsg"></span>
+  <button type="button" id="undoToastBtn">실행취소</button>
 </div>
 
 <div class="app" id="appRoot" style="display:none;">
@@ -980,7 +1015,7 @@
     if (ev.memo) subParts.push(ev.memo);
 
     row.innerHTML =
-      '<input type="checkbox" class="done-check" ' + (ev.done ? "checked" : "") + ' />' +
+      '<input type="checkbox" class="done-check" title="' + (ev.done ? "완료 취소" : "완료로 표시") + '" ' + (ev.done ? "checked" : "") + ' />' +
       '<div class="dday-badge">' + ddayLabel(diff) + '</div>' +
       '<div class="type-badge" style="background:' + typeColor(ev.type) + '">' + escapeHtml(ev.type) + '</div>' +
       '<div class="event-main">' +
@@ -1014,11 +1049,33 @@
     return row;
   }
 
+  var undoToastTimer = null;
+  function showUndoToast(message, onUndo) {
+    var toast = document.getElementById("undoToast");
+    document.getElementById("undoToastMsg").textContent = message;
+    toast.classList.add("show");
+    clearTimeout(undoToastTimer);
+
+    var oldBtn = document.getElementById("undoToastBtn");
+    var newBtn = oldBtn.cloneNode(true); // 이전 클릭 리스너 제거
+    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+    newBtn.addEventListener("click", function () {
+      clearTimeout(undoToastTimer);
+      toast.classList.remove("show");
+      onUndo();
+    });
+
+    undoToastTimer = setTimeout(function () { toast.classList.remove("show"); }, 5000);
+  }
+
   async function toggleDone(id, done) {
     var ev = state.events.find(function (e) { return e.id === id; });
     if (!ev) return;
     ev.done = done;
     renderAll();
+    if (done) {
+      showUndoToast(formatCaseLabel(ev) + " 완료 처리됨", function () { toggleDone(id, false); });
+    }
     var res = await sb.from("events").update({ done: done }).eq("id", id);
     if (res.error) {
       alert("저장 실패: " + res.error.message);
