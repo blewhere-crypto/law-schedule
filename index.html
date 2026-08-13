@@ -582,6 +582,17 @@
        어디가 스크롤되는지 헷갈리기 쉬워서, 카드 내부 스크롤을 없애고
        페이지 전체가 하나로 스크롤되게 합니다. */
     #urgentList { max-height: none; overflow-y: visible; }
+
+    /* 일정 추가/수정 팝업이 화면보다 커서 저장 버튼까지 스크롤해야 했던 문제 완화 */
+    #modalOverlay { padding: 10px; }
+    .modal { padding: 16px; max-height: 94vh; }
+    .modal h3 { margin-bottom: 12px; font-size: 16px; }
+    .form-section { padding: 10px 10px 0; margin-bottom: 10px; }
+    .form-section-title { margin-bottom: 6px; }
+    .field { margin-bottom: 10px; }
+    .field label { margin-bottom: 3px; }
+    .field-hint { margin-top: 3px; }
+    .modal-actions { margin-top: 12px; }
   }
 
   /* 세로로 아주 긴 화면(21:9 등)에서 캘린더/카드에 여유 공간을 더 준다 */
