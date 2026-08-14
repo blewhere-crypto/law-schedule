@@ -762,10 +762,13 @@
   <div class="card">
     <div class="card-header">
       <h2>중요 일정 <button type="button" id="urgentFilterBadge" class="filter-badge" style="display:none;"></button></h2>
-      <label class="toggle-label">
-        <input type="checkbox" id="showDoneToggle" />
-        완료된 일정도 보기
-      </label>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <label class="toggle-label">
+          <input type="checkbox" id="showDoneToggle" />
+          완료된 일정도 보기
+        </label>
+        <button type="button" class="btn-ghost" id="toggleUrgentListBtn" style="font-size:12px;padding:6px 10px;">모두 접기</button>
+      </div>
     </div>
     <div id="urgentList"></div>
   </div>
@@ -913,6 +916,7 @@
     currentUser: null,
     urgentFilter: "all", // "all" | "today" | "week" | "overdue"
     collapsedCases: {}, // { [caseNumber]: true } — 사건별 보기에서 접힌 사건
+    urgentListCollapsed: false, // 중요 일정 전체 접힘 여부
   };
 
   function rowToEvent(row) {
@@ -1232,6 +1236,9 @@
       badge.textContent = URGENT_FILTER_LABELS[filter] + " ✕";
       showDoneToggleEl.disabled = true;
     }
+
+    list.style.display = state.urgentListCollapsed ? "none" : "";
+    document.getElementById("toggleUrgentListBtn").textContent = state.urgentListCollapsed ? "모두 펼치기" : "모두 접기";
 
     list.innerHTML = "";
     if (items.length === 0) {
@@ -1928,6 +1935,11 @@
 
     document.getElementById("showDoneToggle").addEventListener("change", function () {
       state.showDone = this.checked;
+      renderUrgentList();
+    });
+
+    document.getElementById("toggleUrgentListBtn").addEventListener("click", function () {
+      state.urgentListCollapsed = !state.urgentListCollapsed;
       renderUrgentList();
     });
 
