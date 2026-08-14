@@ -279,8 +279,11 @@
     background: var(--navy);
     color: #fff;
   }
-  .event-row.overdue .dday-badge { background: var(--danger); }
-  .event-row.soon .dday-badge { background: var(--warn); }
+  /* 남은 일수에 따른 D-day 배지 색상: D-day/경과=빨강, ~D-7=주황, ~D-30=남색, D-31~=검정 */
+  .dday-badge.dday-red { background: var(--danger); }
+  .dday-badge.dday-soon { background: var(--warn); }
+  .dday-badge.dday-navy { background: #1e3a5f; }
+  .dday-badge.dday-black { background: #1c1c1c; }
   .type-badge {
     flex: 0 0 auto;
     font-size: 11px;
@@ -976,6 +979,12 @@
     if (diff > 0) return "D-" + diff;
     return "D+" + (-diff);
   }
+  function ddayTierClass(diff) {
+    if (diff <= 0) return "dday-red";     // D-day, 경과
+    if (diff <= 7) return "dday-soon";    // D-1 ~ D-7
+    if (diff <= 30) return "dday-navy";   // D-8 ~ D-30
+    return "dday-black";                  // D-31 이후
+  }
   function formatDateHuman(dateStr) {
     var d = parseDate(dateStr);
     var dows = ["일", "월", "화", "수", "목", "금", "토"];
@@ -1119,7 +1128,7 @@
 
     row.innerHTML =
       '<input type="checkbox" class="done-check" title="' + (ev.done ? "완료 취소" : "완료로 표시") + '" ' + (ev.done ? "checked" : "") + ' />' +
-      '<div class="dday-badge">' + ddayLabel(diff) + '</div>' +
+      '<div class="dday-badge ' + ddayTierClass(diff) + '">' + ddayLabel(diff) + '</div>' +
       '<div class="type-badge" style="background:' + typeColor(ev.type) + '">' + escapeHtml(ev.type) + '</div>' +
       '<div class="event-main">' +
         '<div class="event-case">' + escapeHtml(primaryText) + '</div>' +
