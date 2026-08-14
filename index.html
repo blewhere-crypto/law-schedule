@@ -1671,11 +1671,10 @@
     refreshNoticeTicker();
   }
 
-  // ---------- 상단 알림 티커 (오늘 일정 → 1주일 이내 일정 → 오늘 날씨 순환) ----------
+  // ---------- 상단 알림 티커 (오늘 일정 → 1주일 이내 일정 순환) ----------
   var noticeItems = [];
   var noticeIndex = 0;
   var noticeTimer = null;
-  var weatherNoticeCache = null;
 
   function buildScheduleNoticeItems() {
     var todayS = todayStr();
@@ -1707,48 +1706,6 @@
     ];
   }
 
-  var WEATHER_CODE_TEXT = {
-    0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림",
-    45: "안개", 48: "짙은 안개",
-    51: "약한 이슬비", 53: "이슬비", 55: "강한 이슬비",
-    56: "약한 언 이슬비", 57: "언 이슬비",
-    61: "약한 비", 63: "비", 65: "강한 비",
-    66: "약한 어는비", 67: "어는비",
-    71: "약한 눈", 73: "눈", 75: "강한 눈", 77: "싸락눈",
-    80: "약한 소나기", 81: "소나기", 82: "강한 소나기",
-    85: "약한 눈 소나기", 86: "눈 소나기",
-    95: "뇌우", 96: "우박 동반 뇌우", 99: "강한 우박 동반 뇌우",
-  };
-
-  function getCoordsForWeather() {
-    return new Promise(function (resolve) {
-      if (!navigator.geolocation) { resolve({ lat: 37.5665, lon: 126.9780 }); return; }
-      navigator.geolocation.getCurrentPosition(
-        function (pos) { resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
-        function () { resolve({ lat: 37.5665, lon: 126.9780 }); }, // 실패 시 서울 기본값
-        { timeout: 5000 }
-      );
-    });
-  }
-
-  async function getWeatherNoticeItem() {
-    if (weatherNoticeCache) return weatherNoticeCache;
-    try {
-      var coords = await getCoordsForWeather();
-      var res = await fetch(
-        "https://api.open-meteo.com/v1/forecast?latitude=" + coords.lat +
-        "&longitude=" + coords.lon + "&current_weather=true"
-      );
-      var data = await res.json();
-      var cw = data.current_weather;
-      var desc = WEATHER_CODE_TEXT[cw.weathercode] || "-";
-      weatherNoticeCache = { tag: "날씨", text: desc + " · " + Math.round(cw.temperature) + "°C" };
-    } catch (e) {
-      weatherNoticeCache = { tag: "날씨", text: "날씨 정보를 불러올 수 없습니다." };
-    }
-    return weatherNoticeCache;
-  }
-
   function renderNoticeItem() {
     if (!noticeItems.length) return;
     var item = noticeItems[noticeIndex % noticeItems.length];
@@ -1766,10 +1723,8 @@
     noticeTimer = setInterval(advanceNotice, 4500);
   }
 
-  async function refreshNoticeTicker() {
-    var items = buildScheduleNoticeItems();
-    items.push(await getWeatherNoticeItem());
-    noticeItems = items;
+  function refreshNoticeTicker() {
+    noticeItems = buildScheduleNoticeItems();
     renderNoticeItem();
   }
 
