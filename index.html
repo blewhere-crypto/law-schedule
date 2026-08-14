@@ -50,10 +50,9 @@
   }
   header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     margin-bottom: 20px;
-    flex-wrap: wrap;
     gap: 12px;
   }
   header h1 {
@@ -69,9 +68,8 @@
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 12px;
   }
   .notice-ticker {
     display: flex;
@@ -83,7 +81,10 @@
     padding: 8px 14px;
     font-size: 12.5px;
     color: var(--text);
+    width: 360px;
     max-width: 100%;
+    box-sizing: border-box;
+    flex: 0 1 360px;
     cursor: pointer;
     transition: opacity 0.15s;
   }
@@ -105,8 +106,8 @@
     min-width: 0;
   }
   @media (max-width: 560px) {
-    .header-actions { width: 100%; justify-content: space-between; }
-    .notice-ticker { order: 2; width: 100%; }
+    .header-actions { flex-wrap: wrap; }
+    .notice-ticker { order: 2; width: 100%; flex-basis: 100%; }
     #addBtn { order: 1; margin-left: auto; }
   }
   header .today-label {
