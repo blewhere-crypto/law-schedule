@@ -65,6 +65,50 @@
   .header-title { display: flex; align-items: center; gap: 12px; }
   .brand-logo { width: 44px; height: auto; flex: 0 0 auto; }
   .auth-box-logo { width: 64px; height: auto; display: block; margin: 0 auto 14px; }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .notice-ticker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gold-soft);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    color: var(--text);
+    max-width: 100%;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .notice-ticker:hover { opacity: 0.85; }
+  .notice-tag {
+    flex: 0 0 auto;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--navy);
+    border-radius: 100px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .notice-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  @media (max-width: 560px) {
+    .header-actions { width: 100%; justify-content: space-between; }
+    .notice-ticker { order: 2; width: 100%; }
+    #addBtn { order: 1; margin-left: auto; }
+  }
   header .today-label {
     font-size: 13px;
     color: var(--text-muted);
@@ -682,7 +726,13 @@
         <div class="today-label" id="todayLabel"></div>
       </div>
     </div>
-    <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
+    <div class="header-actions">
+      <div class="notice-ticker" id="noticeTicker" title="탭하면 다음 안내로 넘어갑니다">
+        <span class="notice-tag" id="noticeTag">오늘</span>
+        <span class="notice-text" id="noticeText">불러오는 중…</span>
+      </div>
+      <button class="btn btn-primary" id="addBtn">+ 일정 추가</button>
+    </div>
   </header>
 
   <div class="stats-row" id="statsRow">
@@ -1618,6 +1668,109 @@
     renderUrgentList();
     renderCalendar();
     if (state.activeView === "case") renderCaseView();
+    refreshNoticeTicker();
+  }
+
+  // ---------- 상단 알림 티커 (오늘 일정 → 1주일 이내 일정 → 오늘 날씨 순환) ----------
+  var noticeItems = [];
+  var noticeIndex = 0;
+  var noticeTimer = null;
+  var weatherNoticeCache = null;
+
+  function buildScheduleNoticeItems() {
+    var todayS = todayStr();
+    var pending = state.events.filter(function (e) { return !e.done; });
+    var todayList = pending.filter(function (e) { return e.date === todayS; });
+    var weekList = pending.filter(function (e) {
+      var diff = diffDaysFromToday(e.date);
+      return diff >= 0 && diff <= 7;
+    });
+
+    var todayText;
+    if (todayList.length === 0) {
+      todayText = "오늘 예정된 일정이 없습니다.";
+    } else if (todayList.length === 1) {
+      todayText = formatCaseLabel(todayList[0]) + " · " + todayList[0].type;
+    } else {
+      todayText = "오늘 일정 " + todayList.length + "건 · " +
+        todayList.map(function (e) { return formatCaseLabel(e); }).join(", ");
+    }
+
+    var weekText = weekList.length === 0
+      ? "1주일 이내 예정된 일정이 없습니다."
+      : "1주일 이내 일정 " + weekList.length + "건 · " +
+        weekList.map(function (e) { return formatCaseLabel(e) + "(" + formatDateHuman(e.date) + ")"; }).join(", ");
+
+    return [
+      { tag: "오늘", text: todayText },
+      { tag: "이번주", text: weekText },
+    ];
+  }
+
+  var WEATHER_CODE_TEXT = {
+    0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림",
+    45: "안개", 48: "짙은 안개",
+    51: "약한 이슬비", 53: "이슬비", 55: "강한 이슬비",
+    56: "약한 언 이슬비", 57: "언 이슬비",
+    61: "약한 비", 63: "비", 65: "강한 비",
+    66: "약한 어는비", 67: "어는비",
+    71: "약한 눈", 73: "눈", 75: "강한 눈", 77: "싸락눈",
+    80: "약한 소나기", 81: "소나기", 82: "강한 소나기",
+    85: "약한 눈 소나기", 86: "눈 소나기",
+    95: "뇌우", 96: "우박 동반 뇌우", 99: "강한 우박 동반 뇌우",
+  };
+
+  function getCoordsForWeather() {
+    return new Promise(function (resolve) {
+      if (!navigator.geolocation) { resolve({ lat: 37.5665, lon: 126.9780 }); return; }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) { resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }); },
+        function () { resolve({ lat: 37.5665, lon: 126.9780 }); }, // 실패 시 서울 기본값
+        { timeout: 5000 }
+      );
+    });
+  }
+
+  async function getWeatherNoticeItem() {
+    if (weatherNoticeCache) return weatherNoticeCache;
+    try {
+      var coords = await getCoordsForWeather();
+      var res = await fetch(
+        "https://api.open-meteo.com/v1/forecast?latitude=" + coords.lat +
+        "&longitude=" + coords.lon + "&current_weather=true"
+      );
+      var data = await res.json();
+      var cw = data.current_weather;
+      var desc = WEATHER_CODE_TEXT[cw.weathercode] || "-";
+      weatherNoticeCache = { tag: "날씨", text: desc + " · " + Math.round(cw.temperature) + "°C" };
+    } catch (e) {
+      weatherNoticeCache = { tag: "날씨", text: "날씨 정보를 불러올 수 없습니다." };
+    }
+    return weatherNoticeCache;
+  }
+
+  function renderNoticeItem() {
+    if (!noticeItems.length) return;
+    var item = noticeItems[noticeIndex % noticeItems.length];
+    document.getElementById("noticeTag").textContent = item.tag;
+    document.getElementById("noticeText").textContent = item.text;
+  }
+
+  function advanceNotice() {
+    noticeIndex = noticeItems.length ? (noticeIndex + 1) % noticeItems.length : 0;
+    renderNoticeItem();
+  }
+
+  function startNoticeRotation() {
+    if (noticeTimer) clearInterval(noticeTimer);
+    noticeTimer = setInterval(advanceNotice, 4500);
+  }
+
+  async function refreshNoticeTicker() {
+    var items = buildScheduleNoticeItems();
+    items.push(await getWeatherNoticeItem());
+    noticeItems = items;
+    renderNoticeItem();
   }
 
   // ---------- 로그인 ----------
@@ -1641,6 +1794,7 @@
     document.getElementById("userEmailLabel").textContent = user.email || "";
     await refreshEventsFromServer();
     refreshNaverStatus();
+    startNoticeRotation();
     if (!realtimeChannel) {
       realtimeChannel = sb
         .channel("events-sync")
@@ -1658,6 +1812,7 @@
       sb.removeChannel(realtimeChannel);
       realtimeChannel = null;
     }
+    if (noticeTimer) { clearInterval(noticeTimer); noticeTimer = null; }
     document.getElementById("appRoot").style.display = "none";
     document.getElementById("authOverlay").classList.add("open");
   }
@@ -1789,6 +1944,10 @@
     initAuth();
 
     document.getElementById("addBtn").addEventListener("click", function () { openFormModal({}); });
+    document.getElementById("noticeTicker").addEventListener("click", function () {
+      advanceNotice();
+      startNoticeRotation(); // 수동으로 넘기면 타이머를 리셋해서 바로 다음 자동 전환까지 시간을 줌
+    });
     document.getElementById("cancelBtn").addEventListener("click", closeFormModal);
     document.getElementById("modalOverlay").addEventListener("click", function (e) { if (e.target === this) closeFormModal(); });
     document.getElementById("eventForm").addEventListener("submit", submitForm);
