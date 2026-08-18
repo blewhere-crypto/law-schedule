@@ -186,7 +186,7 @@
   /* 대시보드 요약 */
   .stats-row {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
     margin-bottom: 20px;
   }
@@ -210,6 +210,7 @@
   .stat-tile.accent-overdue .stat-num { color: var(--danger); }
   .stat-tile.accent-overdue.active { background: var(--danger-bg); border-color: var(--danger); }
   .stat-tile.accent-case .stat-num { color: var(--type-조정기일); }
+  .stat-tile.accent-done .stat-num { color: var(--ok); }
   .filter-badge {
     display: inline-flex;
     align-items: center;
@@ -224,6 +225,9 @@
     margin-left: 6px;
     cursor: pointer;
     vertical-align: middle;
+  }
+  @media (max-width: 768px) {
+    .stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 480px) {
     .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -760,6 +764,10 @@
       <div class="stat-num" id="statCases">0</div>
       <div class="stat-label">진행 사건수</div>
     </div>
+    <div class="stat-tile accent-done" id="statTileDone" data-filter="done">
+      <div class="stat-num" id="statDone">0</div>
+      <div class="stat-label">완료된 일정</div>
+    </div>
   </div>
 
   <div class="card">
@@ -1197,7 +1205,7 @@
   }
 
   // ---------- 중요 일정 ----------
-  var URGENT_FILTER_LABELS = { today: "오늘 할 일", week: "1주일 이내", overdue: "일정 경과" };
+  var URGENT_FILTER_LABELS = { today: "오늘 할 일", week: "1주일 이내", overdue: "일정 경과", done: "완료된 일정" };
 
   function setUrgentFilter(f) {
     state.urgentFilter = f;
@@ -1206,7 +1214,7 @@
   }
 
   function updateStatTileActiveClasses() {
-    ["statTileTotal", "statTileToday", "statTileWeek", "statTileOverdue"].forEach(function (id) {
+    ["statTileTotal", "statTileToday", "statTileWeek", "statTileOverdue", "statTileDone"].forEach(function (id) {
       var el = document.getElementById(id);
       el.classList.toggle("active", state.urgentFilter === el.getAttribute("data-filter"));
     });
@@ -1227,6 +1235,8 @@
       });
     } else if (filter === "overdue") {
       items = state.events.filter(function (e) { return !e.done && diffDaysFromToday(e.date) < 0; });
+    } else if (filter === "done") {
+      items = state.events.filter(function (e) { return e.done; });
     } else {
       items = state.events.filter(function (e) { return state.showDone || !e.done; });
     }
@@ -1671,12 +1681,14 @@
     var overdueCount = pending.filter(function (e) { return diffDaysFromToday(e.date) < 0; }).length;
     var caseSet = {};
     pending.forEach(function (e) { if (e.caseNumber) caseSet[e.caseNumber] = true; });
+    var doneCount = state.events.filter(function (e) { return e.done; }).length;
 
     document.getElementById("statTotal").textContent = pending.length;
     document.getElementById("statToday").textContent = todayCount;
     document.getElementById("statWeek").textContent = weekCount;
     document.getElementById("statOverdue").textContent = overdueCount;
     document.getElementById("statCases").textContent = Object.keys(caseSet).length;
+    document.getElementById("statDone").textContent = doneCount;
     updateStatTileActiveClasses();
   }
 
@@ -1957,6 +1969,7 @@
     document.getElementById("statTileToday").addEventListener("click", function () { setUrgentFilter("today"); });
     document.getElementById("statTileWeek").addEventListener("click", function () { setUrgentFilter("week"); });
     document.getElementById("statTileOverdue").addEventListener("click", function () { setUrgentFilter("overdue"); });
+    document.getElementById("statTileDone").addEventListener("click", function () { setUrgentFilter("done"); });
     document.getElementById("statTileCases").addEventListener("click", function () {
       switchView("case");
       document.getElementById("caseGroupList").scrollIntoView({ behavior: "smooth", block: "nearest" });
