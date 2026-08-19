@@ -723,6 +723,7 @@
 <div class="app" id="appRoot" style="display:none;">
   <div class="utility-bar">
     <span class="user-email" id="userEmailLabel"></span>
+    <button type="button" class="link-btn" id="pushNotifyBtn">푸시 알림 켜기</button>
     <button type="button" class="link-btn" id="naverConnectBtn">네이버 연결</button>
     <button type="button" class="link-btn" id="logoutBtn">로그아웃</button>
   </div>
@@ -908,6 +909,9 @@
   // 네이버 로그인 애플리케이션의 Client ID (공개 정보 — Client Secret과 달리 브라우저에 있어도 안전합니다)
   var NAVER_CLIENT_ID = "GPB2IA_m9evqcTzHiOuM";
 
+  // 웹 푸시용 VAPID 공개키 (공개 정보 — 개인키와 달리 브라우저에 있어도 안전합니다)
+  var VAPID_PUBLIC_KEY = "BEJ3XjoFnxuabutAmgGl-NFcEhOHpLFJOKRfW6c8GUiJ3Rg9HaSlfACrxDBmLjSI3CFgmxItw5mPxOMx6bScc9M";
+
   var TYPE_COLOR_VAR = {
     "변론기일": "var(--type-변론기일)",
     "선고기일": "var(--type-선고기일)",
@@ -1079,6 +1083,79 @@
       "&redirect_uri=" + encodeURIComponent(naverRedirectUri()) +
       "&state=" + encodeURIComponent(state);
     window.open(authUrl, "naverLogin", "width=480,height=640");
+  }
+
+  // ---------- 푸시 알림 ----------
+  function urlBase64ToUint8Array(base64String) {
+    var padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    var rawData = atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  function updatePushBtn(subscribed) {
+    var btn = document.getElementById("pushNotifyBtn");
+    btn.textContent = subscribed ? "푸시 알림 켜짐" : "푸시 알림 켜기";
+    btn.dataset.subscribed = subscribed ? "1" : "";
+  }
+
+  async function refreshPushStatus() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      document.getElementById("pushNotifyBtn").style.display = "none";
+      return;
+    }
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      updatePushBtn(!!sub);
+    } catch (e) {
+      updatePushBtn(false);
+    }
+  }
+
+  async function subscribeToPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      alert("이 브라우저는 푸시 알림을 지원하지 않습니다.");
+      return;
+    }
+    var permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      alert("알림 권한이 허용되지 않았습니다. 브라우저 설정에서 알림을 허용해주세요.");
+      return;
+    }
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+      var res = await sb.functions.invoke("push", { body: { action: "subscribe", subscription: sub.toJSON() } });
+      if (res.error || (res.data && res.data.error)) {
+        var msg = (res.data && res.data.error) || (res.error && res.error.message) || "알 수 없는 오류";
+        alert("알림 구독 실패: " + msg);
+        return;
+      }
+      updatePushBtn(true);
+      alert("푸시 알림이 켜졌습니다. 매일 아침 오늘 일정을 알려드려요.");
+    } catch (e) {
+      alert("알림 구독 실패: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function unsubscribeFromPush() {
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await sb.functions.invoke("push", { body: { action: "unsubscribe", endpoint: sub.endpoint } });
+        await sub.unsubscribe();
+      }
+    } catch (e) {
+      // ignore
+    }
+    updatePushBtn(false);
   }
 
   function updateNaverConnectBtn(connected) {
@@ -1778,6 +1855,7 @@
     document.getElementById("userEmailLabel").textContent = user.email || "";
     await refreshEventsFromServer();
     refreshNaverStatus();
+    refreshPushStatus();
     startNoticeRotation();
     if (!realtimeChannel) {
       realtimeChannel = sb
@@ -1881,6 +1959,15 @@
       var session = sessionRes.data && sessionRes.data.session;
       if (session) onSignedIn(session.user);
       else onSignedOut();
+    });
+
+    document.getElementById("pushNotifyBtn").addEventListener("click", function () {
+      if (this.dataset.subscribed) {
+        if (!confirm("푸시 알림을 끌까요?")) return;
+        unsubscribeFromPush();
+      } else {
+        subscribeToPush();
+      }
     });
 
     document.getElementById("naverConnectBtn").addEventListener("click", async function () {

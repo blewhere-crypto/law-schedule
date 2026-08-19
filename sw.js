@@ -1,4 +1,4 @@
-var CACHE_NAME = "law-schedule-v3";
+var CACHE_NAME = "law-schedule-v4";
 var ASSETS = [
   "./",
   "./index.html",
@@ -66,6 +66,30 @@ self.addEventListener("fetch", function (event) {
         })
         .catch(function () { return cached; });
       return cached || fetchPromise;
+    })
+  );
+});
+
+self.addEventListener("push", function (event) {
+  var data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) {}
+  var title = data.title || "일정관리";
+  var options = {
+    body: data.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/favicon-32.png",
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window" }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        if ("focus" in clientList[i]) return clientList[i].focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
     })
   );
 });
