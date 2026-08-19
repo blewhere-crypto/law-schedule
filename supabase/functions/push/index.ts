@@ -140,10 +140,11 @@ async function sendReminders() {
   if (error) return json({ error: error.message }, 500);
 
   const now = new Date();
+  const STALE_GRACE_MS = 24 * 60 * 60 * 1000; // 일정 시각이 24시간 넘게 지났으면 지금 와서 보내지 않음
   const dueEvents = (events || []).filter((e: any) => {
     const eventAt = eventDateTimeKST(e.date, e.time);
     if (isNaN(eventAt.getTime())) return false;
-    return eventAt.getTime() > now.getTime(); // 이미 지난 일정은 대상에서 제외
+    return eventAt.getTime() > now.getTime() - STALE_GRACE_MS;
   });
   if (dueEvents.length === 0) return json({ sent: 0, checked: (events || []).length });
 
