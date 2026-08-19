@@ -17,10 +17,25 @@ alter table public.push_subscriptions enable row level security;
 -- 의도적으로 정책(policy)을 추가하지 않습니다 → anon/authenticated 키로는 전혀 접근 불가.
 
 
+-- "몇 시간 전에 알림받을지" 사용자별 설정 저장용 테이블 (이것도 service_role 전용)
+create table if not exists public.user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  remind_hours_before int not null default 2,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_settings enable row level security;
+-- 의도적으로 정책(policy)을 추가하지 않습니다 → anon/authenticated 키로는 전혀 접근 불가.
+
+
+-- 일정 하나당 리마인더를 중복 발송하지 않도록 발송 시각을 기록하는 컬럼
+alter table public.events add column if not exists reminder_sent_at timestamptz;
+
+
 -- ============================================================
--- 아래는 "매일 아침 오늘 일정 요약 푸시"를 자동 실행하는 예약 작업입니다.
+-- 아래는 예약 작업(pg_cron) 등록입니다.
 -- 1) 먼저 Supabase 대시보드 → Database → Extensions 에서 pg_cron, pg_net 을 켜주세요.
--- 2) 아래에서 YOUR_SERVICE_ROLE_KEY 부분을,
+-- 2) 아래 두 군데의 YOUR_SERVICE_ROLE_KEY 부분을,
 --    Project Settings → API 에 있는 service_role 키(비밀 키! anon 키 아님)로 바꾼 뒤 실행하세요.
 --    이 키는 절대 코드/채팅으로 공유하지 말고 여기 SQL Editor에만 붙여넣어주세요.
 -- ============================================================
@@ -28,7 +43,7 @@ alter table public.push_subscriptions enable row level security;
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- 매일 한국시간(KST) 오전 8시 = UTC 전날 23시에 실행
+-- ① 매일 아침 요약: 한국시간(KST) 오전 8시 = UTC 전날 23시에 실행
 select cron.schedule(
   'daily-schedule-push',
   '0 23 * * *',
@@ -44,8 +59,25 @@ select cron.schedule(
   $$
 );
 
+-- ② 일정 N시간 전 리마인더: 15분마다 확인해서, 알림 시점이 된 일정이 있으면 발송
+select cron.schedule(
+  'event-reminder-push',
+  '*/15 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://vgqhteollbpdvpdsogsy.supabase.co/functions/v1/push',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY'
+    ),
+    body := jsonb_build_object('action', 'send-reminders')
+  );
+  $$
+);
+
 -- 이미 등록한 예약 작업을 지우고 싶을 때:
 -- select cron.unschedule('daily-schedule-push');
+-- select cron.unschedule('event-reminder-push');
 
 -- 예약 작업이 잘 등록됐는지 확인:
 -- select * from cron.job;

@@ -533,6 +533,15 @@
   }
   .link-btn:hover { color: var(--text); }
   .link-btn[data-connected="1"] { color: #03c75a; text-decoration: none; font-weight: 700; }
+  .reminder-hours-select {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 3px 6px;
+    cursor: pointer;
+  }
 
   /* 모달 */
   #modalOverlay {
@@ -724,6 +733,14 @@
   <div class="utility-bar">
     <span class="user-email" id="userEmailLabel"></span>
     <button type="button" class="link-btn" id="pushNotifyBtn">푸시 알림 켜기</button>
+    <select id="reminderHoursSelect" class="reminder-hours-select" title="일정 시작 몇 시간 전에 알림받을지 설정">
+      <option value="1">1시간 전</option>
+      <option value="2">2시간 전</option>
+      <option value="3">3시간 전</option>
+      <option value="6">6시간 전</option>
+      <option value="12">12시간 전</option>
+      <option value="24">24시간 전</option>
+    </select>
     <button type="button" class="link-btn" id="naverConnectBtn">네이버 연결</button>
     <button type="button" class="link-btn" id="logoutBtn">로그아웃</button>
   </div>
@@ -1104,6 +1121,7 @@
   async function refreshPushStatus() {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       document.getElementById("pushNotifyBtn").style.display = "none";
+      document.getElementById("reminderHoursSelect").style.display = "none";
       return;
     }
     try {
@@ -1112,6 +1130,16 @@
       updatePushBtn(!!sub);
     } catch (e) {
       updatePushBtn(false);
+    }
+  }
+
+  async function refreshReminderHoursSetting() {
+    try {
+      var res = await sb.functions.invoke("push", { body: { action: "get-settings" } });
+      var hours = (res.data && res.data.remindHoursBefore) || 2;
+      document.getElementById("reminderHoursSelect").value = String(hours);
+    } catch (e) {
+      // 기본값(select의 기본 선택)을 그대로 둠
     }
   }
 
@@ -1856,6 +1884,7 @@
     await refreshEventsFromServer();
     refreshNaverStatus();
     refreshPushStatus();
+    refreshReminderHoursSetting();
     startNoticeRotation();
     if (!realtimeChannel) {
       realtimeChannel = sb
@@ -1968,6 +1997,17 @@
       } else {
         subscribeToPush();
       }
+    });
+
+    document.getElementById("reminderHoursSelect").addEventListener("change", async function () {
+      var hours = Number(this.value);
+      var res = await sb.functions.invoke("push", { body: { action: "update-settings", remindHoursBefore: hours } });
+      if (res.error || (res.data && res.data.error)) {
+        var msg = (res.data && res.data.error) || (res.error && res.error.message) || "알 수 없는 오류";
+        alert("설정 저장 실패: " + msg);
+        return;
+      }
+      alert(hours + "시간 전 알림으로 설정했습니다.");
     });
 
     document.getElementById("naverConnectBtn").addEventListener("click", async function () {
