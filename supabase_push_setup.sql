@@ -31,6 +31,9 @@ alter table public.user_settings enable row level security;
 -- 일정 하나당 리마인더를 중복 발송하지 않도록 발송 시각을 기록하는 컬럼
 alter table public.events add column if not exists reminder_sent_at timestamptz;
 
+-- N시간 전 알림을 받을지 여부(사용자가 일정별로 "알람" 버튼으로 켬/끔). 기본은 꺼짐(opt-in).
+alter table public.events add column if not exists remind_enabled boolean not null default false;
+
 
 -- ============================================================
 -- 아래는 예약 작업(pg_cron) 등록입니다.
@@ -43,10 +46,10 @@ alter table public.events add column if not exists reminder_sent_at timestamptz;
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- ① 매일 아침 요약: 한국시간(KST) 오전 8시 = UTC 전날 23시에 실행
+-- ① 매일 아침 요약: 한국시간(KST) 오전 8시 30분 = UTC 전날 23시 30분에 실행
 select cron.schedule(
   'daily-schedule-push',
-  '0 23 * * *',
+  '30 23 * * *',
   $$
   select net.http_post(
     url := 'https://vgqhteollbpdvpdsogsy.supabase.co/functions/v1/push',

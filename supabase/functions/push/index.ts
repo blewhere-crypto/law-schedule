@@ -129,11 +129,13 @@ function eventDateTimeKST(dateStr: string, timeStr: string): Date {
 async function sendReminders() {
   const admin = adminClient();
 
-  // 시간이 지정돼 있고, 아직 완료되지 않았고, 리마인더를 아직 안 보낸 일정만 대상으로 함
+  // 사용자가 알람을 등록(remind_enabled=true)한 일정만 대상으로 함.
+  // 시간이 지정돼 있고, 아직 완료되지 않았고, 리마인더를 아직 안 보낸 일정만 해당.
   const { data: events, error } = await admin
     .from("events")
     .select("*")
     .eq("done", false)
+    .eq("remind_enabled", true)
     .is("reminder_sent_at", null)
     .not("time", "is", null)
     .neq("time", "");

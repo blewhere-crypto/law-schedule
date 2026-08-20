@@ -151,6 +151,10 @@
   .btn-icon.naver-btn:hover { background: #e9fbf1; }
   .btn-icon.naver-btn.synced { background: #03c75a; color: #fff; border-color: #03c75a; }
   .btn-icon.naver-btn.synced:hover { background: #02a94c; }
+  .btn-icon.alarm-btn { font-weight: 700; font-size: 11px; color: var(--navy); border: 1px solid var(--border); padding: 4px 6px; }
+  .btn-icon.alarm-btn:hover { background: var(--gold-soft); }
+  .btn-icon.alarm-btn.enabled { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .btn-icon.alarm-btn.enabled:hover { background: var(--navy-dark); }
 
   .card {
     background: var(--card);
@@ -963,6 +967,7 @@
       memo: row.memo || "",
       done: !!row.done,
       naverSyncedAt: row.naver_synced_at || null,
+      remindEnabled: !!row.remind_enabled,
     };
   }
   function eventToRow(ev) {
@@ -1225,6 +1230,28 @@
     }
   }
 
+  async function toggleEventReminder(ev, btnEl) {
+    if (!ev.time) {
+      alert("시간이 지정된 일정만 알람을 등록할 수 있습니다. 먼저 이 일정에 시간을 입력해주세요.");
+      return;
+    }
+    var enabling = !ev.remindEnabled;
+    if (btnEl) btnEl.disabled = true;
+    try {
+      var patch = { remind_enabled: enabling };
+      if (enabling) patch.reminder_sent_at = null; // 다시 켤 때는 알림 시점 재계산되도록 초기화
+      var res = await sb.from("events").update(patch).eq("id", ev.id);
+      if (res.error) {
+        alert("알람 설정 실패: " + res.error.message);
+        return;
+      }
+      ev.remindEnabled = enabling;
+      renderAll();
+    } finally {
+      if (btnEl) btnEl.disabled = false;
+    }
+  }
+
   function buildEventRowEl(ev) {
     var diff = diffDaysFromToday(ev.date);
     var row = document.createElement("div");
@@ -1248,6 +1275,9 @@
         '<div class="event-sub">' + escapeHtml(subParts.join(" · ")) + '</div>' +
       '</div>' +
       '<div class="event-actions">' +
+        '<button type="button" class="btn-icon alarm-btn' + (ev.remindEnabled ? ' enabled' : '') + '" title="' +
+          (ev.remindEnabled ? '알람 등록됨 (누르면 해제)' : '이 일정에 알람 등록') +
+          '">알람</button>' +
         '<button type="button" class="btn-icon naver-btn' + (ev.naverSyncedAt ? ' synced' : '') + '" title="' +
           (ev.naverSyncedAt ? '이미 네이버 캘린더에 등록됨 (' + ev.naverSyncedAt.slice(0, 10) + ')' : '네이버 캘린더에 바로 등록') +
           '">N</button>' +
@@ -1262,6 +1292,10 @@
     row.querySelector(".done-check").addEventListener("click", function (e) { e.stopPropagation(); });
     row.querySelector(".done-check").addEventListener("change", function () {
       toggleDone(ev.id, this.checked);
+    });
+    row.querySelector(".alarm-btn").addEventListener("click", function (e) {
+      e.stopPropagation();
+      toggleEventReminder(ev, this);
     });
     row.querySelector(".naver-btn").addEventListener("click", function (e) {
       e.stopPropagation();
