@@ -151,10 +151,21 @@
   .btn-icon.naver-btn:hover { background: #e9fbf1; }
   .btn-icon.naver-btn.synced { background: #03c75a; color: #fff; border-color: #03c75a; }
   .btn-icon.naver-btn.synced:hover { background: #02a94c; }
-  .btn-icon.alarm-btn { font-weight: 700; font-size: 11px; color: var(--navy); border: 1px solid var(--border); padding: 4px 6px; }
-  .btn-icon.alarm-btn:hover { background: var(--gold-soft); }
-  .btn-icon.alarm-btn.enabled { background: var(--navy); color: #fff; border-color: var(--navy); }
-  .btn-icon.alarm-btn.enabled:hover { background: var(--navy-dark); }
+  .alarm-select {
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--navy);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 3px;
+    cursor: pointer;
+    max-width: 78px;
+  }
+  .alarm-select:hover { background: var(--gold-soft); }
+  .alarm-select.enabled { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .alarm-select.enabled:hover { background: var(--navy-dark); }
+  .modal-alarm-select { max-width: none; width: auto; }
 
   .card {
     background: var(--card);
@@ -537,15 +548,6 @@
   }
   .link-btn:hover { color: var(--text); }
   .link-btn[data-connected="1"] { color: #03c75a; text-decoration: none; font-weight: 700; }
-  .reminder-hours-select {
-    font-size: 11px;
-    color: var(--text-muted);
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 3px 6px;
-    cursor: pointer;
-  }
 
   /* 모달 */
   #modalOverlay {
@@ -736,15 +738,6 @@
 <div class="app" id="appRoot" style="display:none;">
   <div class="utility-bar">
     <span class="user-email" id="userEmailLabel"></span>
-    <button type="button" class="link-btn" id="pushNotifyBtn">푸시 알림 켜기</button>
-    <select id="reminderHoursSelect" class="reminder-hours-select" title="일정 시작 몇 시간 전에 알림받을지 설정">
-      <option value="1">1시간 전</option>
-      <option value="2">2시간 전</option>
-      <option value="3">3시간 전</option>
-      <option value="6">6시간 전</option>
-      <option value="12">12시간 전</option>
-      <option value="24">24시간 전</option>
-    </select>
     <button type="button" class="link-btn" id="naverConnectBtn">네이버 연결</button>
     <button type="button" class="link-btn" id="logoutBtn">로그아웃</button>
   </div>
@@ -877,6 +870,19 @@
           <div id="dateRows"></div>
           <button type="button" class="btn-ghost" id="addDateRowBtn" style="margin-top:2px;font-size:12px;padding:6px 10px;">+ 날짜 추가</button>
         </div>
+        <div class="field" id="modalAlarmField" style="display:none;">
+          <label for="modalAlarmSelect">알람</label>
+          <select id="modalAlarmSelect" class="alarm-select modal-alarm-select">
+            <option value="">알람 끔</option>
+            <option value="1">1시간 전</option>
+            <option value="2">2시간 전</option>
+            <option value="3">3시간 전</option>
+            <option value="6">6시간 전</option>
+            <option value="12">12시간 전</option>
+            <option value="24">24시간 전</option>
+          </select>
+          <div class="field-hint">일정 시작 몇 시간 전에 푸시 알림을 받을지 선택하세요. 시간이 지정된 일정만 알람을 설정할 수 있어요.</div>
+        </div>
       </div>
 
       <div class="form-section section-extra">
@@ -968,6 +974,7 @@
       done: !!row.done,
       naverSyncedAt: row.naver_synced_at || null,
       remindEnabled: !!row.remind_enabled,
+      remindHoursBefore: row.remind_hours_before || null,
     };
   }
   function eventToRow(ev) {
@@ -1117,50 +1124,24 @@
     return outputArray;
   }
 
-  function updatePushBtn(subscribed) {
-    var btn = document.getElementById("pushNotifyBtn");
-    btn.textContent = subscribed ? "푸시 알림 켜짐" : "푸시 알림 켜기";
-    btn.dataset.subscribed = subscribed ? "1" : "";
-  }
-
-  async function refreshPushStatus() {
+  // 일정에 알람을 처음 등록하는 시점에 필요하면 알림 권한 요청 + 구독을 진행합니다.
+  // (매일 아침 요약 알림도 같은 구독을 사용합니다.)
+  async function ensurePushSubscribed() {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      document.getElementById("pushNotifyBtn").style.display = "none";
-      document.getElementById("reminderHoursSelect").style.display = "none";
-      return;
+      alert("이 브라우저는 푸시 알림을 지원하지 않습니다.");
+      return false;
     }
     try {
       var reg = await navigator.serviceWorker.ready;
       var sub = await reg.pushManager.getSubscription();
-      updatePushBtn(!!sub);
-    } catch (e) {
-      updatePushBtn(false);
-    }
-  }
+      if (sub) return true;
 
-  async function refreshReminderHoursSetting() {
-    try {
-      var res = await sb.functions.invoke("push", { body: { action: "get-settings" } });
-      var hours = (res.data && res.data.remindHoursBefore) || 2;
-      document.getElementById("reminderHoursSelect").value = String(hours);
-    } catch (e) {
-      // 기본값(select의 기본 선택)을 그대로 둠
-    }
-  }
-
-  async function subscribeToPush() {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      alert("이 브라우저는 푸시 알림을 지원하지 않습니다.");
-      return;
-    }
-    var permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      alert("알림 권한이 허용되지 않았습니다. 브라우저 설정에서 알림을 허용해주세요.");
-      return;
-    }
-    try {
-      var reg = await navigator.serviceWorker.ready;
-      var sub = await reg.pushManager.subscribe({
+      var permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        alert("알림 권한이 허용되지 않았습니다. 브라우저(또는 앱) 설정에서 알림을 허용해주세요.");
+        return false;
+      }
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
@@ -1168,27 +1149,13 @@
       if (res.error || (res.data && res.data.error)) {
         var msg = (res.data && res.data.error) || (res.error && res.error.message) || "알 수 없는 오류";
         alert("알림 구독 실패: " + msg);
-        return;
+        return false;
       }
-      updatePushBtn(true);
-      alert("푸시 알림이 켜졌습니다. 매일 아침 오늘 일정을 알려드려요.");
+      return true;
     } catch (e) {
       alert("알림 구독 실패: " + (e && e.message ? e.message : e));
+      return false;
     }
-  }
-
-  async function unsubscribeFromPush() {
-    try {
-      var reg = await navigator.serviceWorker.ready;
-      var sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await sb.functions.invoke("push", { body: { action: "unsubscribe", endpoint: sub.endpoint } });
-        await sub.unsubscribe();
-      }
-    } catch (e) {
-      // ignore
-    }
-    updatePushBtn(false);
   }
 
   function updateNaverConnectBtn(connected) {
@@ -1230,25 +1197,40 @@
     }
   }
 
-  async function toggleEventReminder(ev, btnEl) {
-    if (!ev.time) {
+  function alarmSelectValue(ev) {
+    return ev.remindEnabled && ev.remindHoursBefore ? String(ev.remindHoursBefore) : "";
+  }
+
+  // hours: 알람을 켤 시간(N시간 전), null/""이면 알람 끔
+  async function setEventReminder(ev, hours, selectEl) {
+    if (hours && !ev.time) {
       alert("시간이 지정된 일정만 알람을 등록할 수 있습니다. 먼저 이 일정에 시간을 입력해주세요.");
+      if (selectEl) selectEl.value = alarmSelectValue(ev);
       return;
     }
-    var enabling = !ev.remindEnabled;
-    if (btnEl) btnEl.disabled = true;
+    var enabling = !!hours;
+    if (selectEl) selectEl.disabled = true;
     try {
-      var patch = { remind_enabled: enabling };
+      if (enabling) {
+        var subscribed = await ensurePushSubscribed();
+        if (!subscribed) {
+          if (selectEl) selectEl.value = alarmSelectValue(ev);
+          return;
+        }
+      }
+      var patch = { remind_enabled: enabling, remind_hours_before: enabling ? hours : null };
       if (enabling) patch.reminder_sent_at = null; // 다시 켤 때는 알림 시점 재계산되도록 초기화
       var res = await sb.from("events").update(patch).eq("id", ev.id);
       if (res.error) {
         alert("알람 설정 실패: " + res.error.message);
+        if (selectEl) selectEl.value = alarmSelectValue(ev);
         return;
       }
       ev.remindEnabled = enabling;
+      ev.remindHoursBefore = enabling ? hours : null;
       renderAll();
     } finally {
-      if (btnEl) btnEl.disabled = false;
+      if (selectEl) selectEl.disabled = false;
     }
   }
 
@@ -1275,9 +1257,15 @@
         '<div class="event-sub">' + escapeHtml(subParts.join(" · ")) + '</div>' +
       '</div>' +
       '<div class="event-actions">' +
-        '<button type="button" class="btn-icon alarm-btn' + (ev.remindEnabled ? ' enabled' : '') + '" title="' +
-          (ev.remindEnabled ? '알람 등록됨 (누르면 해제)' : '이 일정에 알람 등록') +
-          '">알람</button>' +
+        '<select class="alarm-select' + (ev.remindEnabled ? ' enabled' : '') + '" title="일정 시작 몇 시간 전에 알람을 받을지 선택">' +
+          '<option value="">알람 끔</option>' +
+          '<option value="1">1시간 전</option>' +
+          '<option value="2">2시간 전</option>' +
+          '<option value="3">3시간 전</option>' +
+          '<option value="6">6시간 전</option>' +
+          '<option value="12">12시간 전</option>' +
+          '<option value="24">24시간 전</option>' +
+        '</select>' +
         '<button type="button" class="btn-icon naver-btn' + (ev.naverSyncedAt ? ' synced' : '') + '" title="' +
           (ev.naverSyncedAt ? '이미 네이버 캘린더에 등록됨 (' + ev.naverSyncedAt.slice(0, 10) + ')' : '네이버 캘린더에 바로 등록') +
           '">N</button>' +
@@ -1293,9 +1281,13 @@
     row.querySelector(".done-check").addEventListener("change", function () {
       toggleDone(ev.id, this.checked);
     });
-    row.querySelector(".alarm-btn").addEventListener("click", function (e) {
+    var alarmSelectEl = row.querySelector(".alarm-select");
+    alarmSelectEl.value = alarmSelectValue(ev);
+    alarmSelectEl.addEventListener("click", function (e) { e.stopPropagation(); });
+    alarmSelectEl.addEventListener("change", function (e) {
       e.stopPropagation();
-      toggleEventReminder(ev, this);
+      var v = this.value;
+      setEventReminder(ev, v ? parseInt(v, 10) : null, this);
     });
     row.querySelector(".naver-btn").addEventListener("click", function (e) {
       e.stopPropagation();
@@ -1731,6 +1723,7 @@
     clearDateRows();
     refreshCaseNumberPicker();
     document.getElementById("caseNumberPickerField").style.display = opts.editId ? "none" : "";
+    document.getElementById("modalAlarmField").style.display = "none";
 
     if (opts.editId) {
       var ev = state.events.find(function (e) { return e.id === opts.editId; });
@@ -1744,6 +1737,14 @@
         document.getElementById("deleteBtn").style.display = "inline-block";
         document.getElementById("addDateRowBtn").style.display = "none";
         addDateRow(ev.date, ev.time);
+
+        document.getElementById("modalAlarmField").style.display = "";
+        var modalAlarmSelect = document.getElementById("modalAlarmSelect");
+        modalAlarmSelect.value = alarmSelectValue(ev);
+        modalAlarmSelect.onchange = function () {
+          var v = this.value;
+          setEventReminder(ev, v ? parseInt(v, 10) : null, this);
+        };
       }
     } else {
       document.getElementById("formTitle").textContent = "일정 추가";
@@ -1917,8 +1918,6 @@
     document.getElementById("userEmailLabel").textContent = user.email || "";
     await refreshEventsFromServer();
     refreshNaverStatus();
-    refreshPushStatus();
-    refreshReminderHoursSetting();
     startNoticeRotation();
     if (!realtimeChannel) {
       realtimeChannel = sb
@@ -2022,26 +2021,6 @@
       var session = sessionRes.data && sessionRes.data.session;
       if (session) onSignedIn(session.user);
       else onSignedOut();
-    });
-
-    document.getElementById("pushNotifyBtn").addEventListener("click", function () {
-      if (this.dataset.subscribed) {
-        if (!confirm("푸시 알림을 끌까요?")) return;
-        unsubscribeFromPush();
-      } else {
-        subscribeToPush();
-      }
-    });
-
-    document.getElementById("reminderHoursSelect").addEventListener("change", async function () {
-      var hours = Number(this.value);
-      var res = await sb.functions.invoke("push", { body: { action: "update-settings", remindHoursBefore: hours } });
-      if (res.error || (res.data && res.data.error)) {
-        var msg = (res.data && res.data.error) || (res.error && res.error.message) || "알 수 없는 오류";
-        alert("설정 저장 실패: " + msg);
-        return;
-      }
-      alert(hours + "시간 전 알림으로 설정했습니다.");
     });
 
     document.getElementById("naverConnectBtn").addEventListener("click", async function () {

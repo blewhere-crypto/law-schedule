@@ -17,22 +17,19 @@ alter table public.push_subscriptions enable row level security;
 -- 의도적으로 정책(policy)을 추가하지 않습니다 → anon/authenticated 키로는 전혀 접근 불가.
 
 
--- "몇 시간 전에 알림받을지" 사용자별 설정 저장용 테이블 (이것도 service_role 전용)
-create table if not exists public.user_settings (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  remind_hours_before int not null default 2,
-  updated_at timestamptz not null default now()
-);
-
-alter table public.user_settings enable row level security;
--- 의도적으로 정책(policy)을 추가하지 않습니다 → anon/authenticated 키로는 전혀 접근 불가.
+-- (참고) user_settings 테이블은 더 이상 사용하지 않습니다.
+-- "몇 시간 전에 알림받을지"는 이제 사용자 전체 설정이 아니라 events.remind_hours_before로
+-- 일정마다 개별 저장됩니다. 기존에 이 테이블을 만드셨다면 그대로 두셔도 무해합니다.
 
 
 -- 일정 하나당 리마인더를 중복 발송하지 않도록 발송 시각을 기록하는 컬럼
 alter table public.events add column if not exists reminder_sent_at timestamptz;
 
--- N시간 전 알림을 받을지 여부(사용자가 일정별로 "알람" 버튼으로 켬/끔). 기본은 꺼짐(opt-in).
+-- N시간 전 알림을 받을지 여부(사용자가 일정별로 "알람" 선택으로 켬/끔). 기본은 꺼짐(opt-in).
 alter table public.events add column if not exists remind_enabled boolean not null default false;
+
+-- 일정별로 몇 시간 전에 알림받을지(예: 2 = 2시간 전). remind_enabled가 true일 때만 사용됨.
+alter table public.events add column if not exists remind_hours_before int;
 
 
 -- ============================================================

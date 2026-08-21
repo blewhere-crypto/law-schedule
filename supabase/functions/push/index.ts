@@ -2,7 +2,9 @@
 //
 // 프런트엔드에서는 sb.functions.invoke("push", { body: { action: "...", ... } })
 // 형태로 호출합니다 (일반 로그인 사용자용). 지원 action:
-//   subscribe / unsubscribe / status / get-settings / update-settings
+//   subscribe / unsubscribe / status
+// (알림 몇 시간 전에 받을지는 이제 user_settings가 아니라 일정(events)마다
+//  remind_enabled / remind_hours_before 컬럼으로 개별 저장됩니다.)
 //
 // action: "send-daily-digest" (매일 아침 요약) / "send-reminders" (일정 N시간 전 알림)
 // 은 사람이 아니라 pg_cron이 자동으로 호출합니다. 이 호출은 service_role 키를
@@ -150,15 +152,8 @@ async function sendReminders() {
   });
   if (dueEvents.length === 0) return json({ sent: 0, checked: (events || []).length });
 
-  // 대상 사용자들의 알림 설정 + 구독 목록을 한 번에 불러옴
+  // 대상 사용자들의 구독 목록을 한 번에 불러옴 (알림 시간은 이제 일정마다 개별 저장됨)
   const userIds = Array.from(new Set(dueEvents.map((e: any) => e.user_id)));
-  const { data: settingsRows } = await admin
-    .from("user_settings")
-    .select("*")
-    .in("user_id", userIds);
-  const settingsByUser: Record<string, number> = {};
-  (settingsRows || []).forEach((s: any) => { settingsByUser[s.user_id] = s.remind_hours_before; });
-
   const { data: subsRows } = await admin
     .from("push_subscriptions")
     .select("*")
@@ -169,7 +164,7 @@ async function sendReminders() {
   const results: any[] = [];
 
   for (const ev of dueEvents) {
-    const hoursBefore = settingsByUser[ev.user_id] ?? DEFAULT_REMIND_HOURS;
+    const hoursBefore = Number(ev.remind_hours_before) > 0 ? Number(ev.remind_hours_before) : DEFAULT_REMIND_HOURS;
     const eventAt = eventDateTimeKST(ev.date, ev.time);
     const remindAt = eventAt.getTime() - hoursBefore * 60 * 60 * 1000;
     if (now.getTime() < remindAt) continue; // 아직 알림 시점이 안 됨
@@ -245,26 +240,6 @@ Deno.serve(async (req: Request) => {
       const admin = adminClient();
       const { data } = await admin.from("push_subscriptions").select("id").eq("user_id", user.id).limit(1);
       return json({ subscribed: !!(data && data.length) });
-    }
-
-    if (action === "get-settings") {
-      const admin = adminClient();
-      const { data } = await admin.from("user_settings").select("remind_hours_before").eq("user_id", user.id).maybeSingle();
-      return json({ remindHoursBefore: data ? data.remind_hours_before : DEFAULT_REMIND_HOURS });
-    }
-
-    if (action === "update-settings") {
-      const hours = Number(body.remindHoursBefore);
-      if (!Number.isFinite(hours) || hours <= 0 || hours > 168) {
-        return json({ error: "시간 값이 올바르지 않습니다." }, 400);
-      }
-      const admin = adminClient();
-      const { error } = await admin.from("user_settings").upsert(
-        { user_id: user.id, remind_hours_before: hours, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
-      );
-      if (error) return json({ error: error.message }, 400);
-      return json({ remindHoursBefore: hours });
     }
 
     return json({ error: "알 수 없는 action입니다." }, 400);
