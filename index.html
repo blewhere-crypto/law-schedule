@@ -481,6 +481,35 @@
   }
   .case-group-list { padding: 10px 12px; }
 
+  #caseOrderHint {
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--gold-soft);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    color: var(--navy-dark);
+  }
+  .case-drag-handle {
+    display: none;
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 8px 2px 0;
+    touch-action: none;
+    user-select: none;
+  }
+  #caseGroupList.reorder-mode .case-drag-handle { display: inline-block; }
+  #caseGroupList.reorder-mode .case-group-toggle { visibility: hidden; }
+  #caseGroupList.reorder-mode .case-group-list { display: none !important; }
+  #caseGroupList.reorder-mode .case-group-add-btn { display: none; }
+  #caseGroupList.reorder-mode .case-group-header { cursor: default; }
+  .case-group.dragging { opacity: 0.55; background: var(--gold-soft); }
+
   /* 로그인 화면 */
   #authOverlay {
     display: none;
@@ -820,9 +849,13 @@
     </div>
 
     <div id="caseView" style="display:none;">
-      <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <div id="caseViewToolbar" style="display:flex; gap:8px; margin-bottom:14px;">
         <input type="text" id="caseSearchInput" placeholder="의뢰인명 또는 사건명으로 검색" style="flex:1; margin-bottom:0;" />
         <button type="button" class="btn-ghost" id="toggleAllCasesBtn" style="font-size:12px; padding:8px 12px; white-space:nowrap;">모두 접기</button>
+      </div>
+      <div id="caseOrderHint" style="display:none;">
+        <span>사건 순서를 편집 중입니다. ⠿ 아이콘을 눌러 끌어서 순서를 바꾸세요.</span>
+        <button type="button" class="btn-primary btn" id="caseOrderDoneBtn" style="padding:6px 14px;font-size:12.5px;">완료</button>
       </div>
       <div id="caseGroupList"></div>
     </div>
@@ -959,7 +992,10 @@
     urgentFilter: "all", // "all" | "today" | "week" | "overdue"
     collapsedCases: {}, // { [caseNumber]: true } — 사건별 보기에서 접힌 사건
     urgentListCollapsed: false, // 중요 일정 전체 접힘 여부
+    caseOrder: [], // 사건별 보기에서 사용자가 직접 정한 순서 (case_number 배열)
+    caseReorderMode: false, // 사건 순서 편집 모드 여부
   };
+  var caseDrag = null; // 사건 순서 드래그 중 임시 상태 (렌더 대상 아님)
 
   function rowToEvent(row) {
     return {
@@ -1546,6 +1582,15 @@
       });
     }
     keys.sort(function (a, b) {
+      if (state.caseOrder.length) {
+        var ia = state.caseOrder.indexOf(a);
+        var ib = state.caseOrder.indexOf(b);
+        if (ia !== -1 || ib !== -1) {
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        }
+      }
       var na = nearestUpcomingDiff(groups[a]);
       var nb = nearestUpcomingDiff(groups[b]);
       if (na === null && nb === null) return a.localeCompare(b);
@@ -1557,10 +1602,16 @@
   }
 
   function renderCaseView() {
+    if (caseDrag) return; // 드래그 도중에는 목록을 다시 그리지 않음
+
+    var container = document.getElementById("caseGroupList");
+    container.classList.toggle("reorder-mode", state.caseReorderMode);
+    document.getElementById("caseViewToolbar").style.display = state.caseReorderMode ? "none" : "flex";
+    document.getElementById("caseOrderHint").style.display = state.caseReorderMode ? "flex" : "none";
+
     var found = getFilteredCaseGroups();
     var groups = found.groups, keys = found.keys, query = found.query;
 
-    var container = document.getElementById("caseGroupList");
     container.innerHTML = "";
     if (keys.length === 0) {
       container.innerHTML = '<div class="empty-msg">' + (query ? "검색 결과가 없습니다." : "등록된 사건이 없습니다.") + '</div>';
@@ -1580,20 +1631,31 @@
 
       var group = document.createElement("div");
       group.className = "case-group" + (isCollapsed ? " collapsed" : "");
+      group.dataset.caseKey = key;
 
       var header = document.createElement("div");
       header.className = "case-group-header";
       header.innerHTML =
-        '<div><button type="button" class="case-group-toggle">▾</button><span class="case-group-number">' + escapeHtml(groupLabel) + '</span></div>' +
+        '<div><span class="case-drag-handle" title="눌러서 끌어 순서 변경">⠿</span><button type="button" class="case-group-toggle">▾</button><span class="case-group-number">' + escapeHtml(groupLabel) + '</span></div>' +
         '<div class="case-group-meta"><span>진행중 ' + pendingCount + '건</span></div>';
       header.addEventListener("click", function (e) {
+        if (state.caseReorderMode) return;
         if (e.target.closest("button") && !e.target.closest(".case-group-toggle")) return;
         toggleCaseCollapsed(key);
+      });
+      attachCaseLongPress(header);
+
+      var handle = header.querySelector(".case-drag-handle");
+      handle.addEventListener("pointerdown", function (e) {
+        if (!state.caseReorderMode) return;
+        e.preventDefault();
+        e.stopPropagation();
+        startCaseDrag(group, e);
       });
 
       var addBtn = document.createElement("button");
       addBtn.type = "button";
-      addBtn.className = "btn-ghost";
+      addBtn.className = "btn-ghost case-group-add-btn";
       addBtn.style.cssText = "font-size:11px;padding:4px 10px;";
       addBtn.textContent = "+ 이 사건에 일정 추가";
       addBtn.addEventListener("click", function (e) {
@@ -1617,6 +1679,108 @@
 
     var anyExpanded = keys.some(function (k) { return !state.collapsedCases[k]; });
     document.getElementById("toggleAllCasesBtn").textContent = anyExpanded ? "모두 접기" : "모두 펼치기";
+  }
+
+  // ---------- 사건별 보기: 길게 누르면 순서 편집 모드 ----------
+  function attachCaseLongPress(headerEl) {
+    var timer = null;
+    var startPos = null;
+    function cancel() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      startPos = null;
+    }
+    headerEl.addEventListener("pointerdown", function (e) {
+      if (state.caseReorderMode) return;
+      if (e.target.closest("button")) return;
+      startPos = { x: e.clientX, y: e.clientY };
+      timer = setTimeout(function () {
+        timer = null;
+        enterCaseReorderMode();
+      }, 550);
+    });
+    headerEl.addEventListener("pointerup", cancel);
+    headerEl.addEventListener("pointerleave", cancel);
+    headerEl.addEventListener("pointercancel", cancel);
+    headerEl.addEventListener("pointermove", function (e) {
+      if (!startPos) return;
+      if (Math.abs(e.clientX - startPos.x) > 8 || Math.abs(e.clientY - startPos.y) > 8) cancel();
+    });
+  }
+
+  function enterCaseReorderMode() {
+    if (state.caseReorderMode) return;
+    state.caseReorderMode = true;
+    document.getElementById("caseSearchInput").value = "";
+    renderCaseView();
+  }
+
+  function exitCaseReorderMode() {
+    state.caseReorderMode = false;
+    renderCaseView();
+  }
+
+  // ---------- 사건별 보기: 드래그로 순서 변경 ----------
+  function startCaseDrag(groupEl, e) {
+    caseDrag = { el: groupEl, pointerId: e.pointerId };
+    groupEl.classList.add("dragging");
+    try { e.target.setPointerCapture(e.pointerId); } catch (_e) {}
+    document.addEventListener("pointermove", onCaseDragMove);
+    document.addEventListener("pointerup", onCaseDragEnd);
+    document.addEventListener("pointercancel", onCaseDragEnd);
+  }
+
+  function onCaseDragMove(e) {
+    if (!caseDrag) return;
+    e.preventDefault();
+    var container = document.getElementById("caseGroupList");
+    var overEl = document.elementFromPoint(e.clientX, e.clientY);
+    var overGroup = overEl && overEl.closest(".case-group");
+    if (!overGroup || overGroup === caseDrag.el || overGroup.parentNode !== container) return;
+    var groups = Array.from(container.children);
+    var draggedIdx = groups.indexOf(caseDrag.el);
+    var overIdx = groups.indexOf(overGroup);
+    if (draggedIdx < overIdx) {
+      container.insertBefore(caseDrag.el, overGroup.nextSibling);
+    } else {
+      container.insertBefore(caseDrag.el, overGroup);
+    }
+  }
+
+  function onCaseDragEnd() {
+    if (!caseDrag) return;
+    caseDrag.el.classList.remove("dragging");
+    document.removeEventListener("pointermove", onCaseDragMove);
+    document.removeEventListener("pointerup", onCaseDragEnd);
+    document.removeEventListener("pointercancel", onCaseDragEnd);
+    caseDrag = null;
+    persistCaseOrderFromDom();
+  }
+
+  async function persistCaseOrderFromDom() {
+    var container = document.getElementById("caseGroupList");
+    var order = Array.from(container.children)
+      .map(function (g) { return g.dataset.caseKey; })
+      .filter(Boolean);
+    state.caseOrder = order;
+    if (!state.currentUser) return;
+    var res = await sb.from("case_order").upsert(
+      { user_id: state.currentUser.id, order_list: order, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    if (res.error) {
+      console.error(res.error);
+      alert("순서 저장 실패: " + res.error.message);
+    }
+  }
+
+  async function refreshCaseOrder() {
+    if (!state.currentUser) return;
+    try {
+      var res = await sb.from("case_order").select("order_list").eq("user_id", state.currentUser.id).maybeSingle();
+      state.caseOrder = (res.data && res.data.order_list) || [];
+    } catch (e) {
+      state.caseOrder = [];
+    }
   }
 
   function switchView(view) {
@@ -1917,6 +2081,7 @@
     document.getElementById("appRoot").style.display = "";
     document.getElementById("userEmailLabel").textContent = user.email || "";
     await refreshEventsFromServer();
+    await refreshCaseOrder();
     refreshNaverStatus();
     startNoticeRotation();
     if (!realtimeChannel) {
@@ -1932,6 +2097,8 @@
   function onSignedOut() {
     state.currentUser = null;
     state.events = [];
+    state.caseOrder = [];
+    state.caseReorderMode = false;
     if (realtimeChannel) {
       sb.removeChannel(realtimeChannel);
       realtimeChannel = null;
@@ -2124,6 +2291,7 @@
       keys.forEach(function (k) { state.collapsedCases[k] = anyExpanded; });
       renderCaseView();
     });
+    document.getElementById("caseOrderDoneBtn").addEventListener("click", exitCaseReorderMode);
 
     document.getElementById("dayModalClose").addEventListener("click", closeDayModal);
     document.getElementById("dayModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeDayModal(); });
