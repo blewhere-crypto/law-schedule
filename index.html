@@ -1918,6 +1918,11 @@
       document.getElementById("caseNumberPicker").value = opts.caseNumber || "";
       document.getElementById("addDateRowBtn").style.display = "inline-block";
       addDateRow(opts.date || todayStr(), "");
+
+      document.getElementById("modalAlarmField").style.display = "";
+      var newAlarmSelect = document.getElementById("modalAlarmSelect");
+      newAlarmSelect.value = "";
+      newAlarmSelect.onchange = null; // 저장 버튼을 누를 때 한꺼번에 적용됨
     }
     updateRemoveButtonsVisibility();
     document.getElementById("modalOverlay").classList.add("open");
@@ -1938,6 +1943,20 @@
     var rows = collectDateRows();
     if (rows.length === 0) return;
 
+    // 신규 등록일 때만 여기서 알람 값을 함께 저장함 (수정일 때는 알람 select가 바로바로 저장됨)
+    var alarmHours = null;
+    if (!id) {
+      var alarmVal = document.getElementById("modalAlarmSelect").value;
+      if (alarmVal) {
+        if (rows.every(function (r) { return !r.time; })) {
+          alert("시간이 지정된 일정만 알람을 등록할 수 있습니다. 시간을 입력하시면 알람 없이 우선 저장됩니다.");
+        } else {
+          var subscribed = await ensurePushSubscribed();
+          if (subscribed) alarmHours = parseInt(alarmVal, 10);
+        }
+      }
+    }
+
     var saveBtn = document.getElementById("eventForm").querySelector('button[type="submit"]');
     saveBtn.disabled = true;
 
@@ -1947,7 +1966,12 @@
       res = await sb.from("events").update(patch).eq("id", id);
     } else {
       var payload = rows.map(function (r) {
-        return eventToRow(Object.assign({}, base, { date: r.date, time: r.time, done: false }));
+        var row = eventToRow(Object.assign({}, base, { date: r.date, time: r.time, done: false }));
+        if (alarmHours && r.time) {
+          row.remind_enabled = true;
+          row.remind_hours_before = alarmHours;
+        }
+        return row;
       });
       res = await sb.from("events").insert(payload);
     }
